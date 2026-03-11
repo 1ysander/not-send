@@ -1,0 +1,97 @@
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { MessageCircle, Bot, Inbox, Users, BarChart3, Settings } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+
+const navItems = [
+  { path: "/", end: true, label: "Chats", icon: MessageCircle },
+  { path: "/ai-chat", end: false, label: "AI Chat", icon: Bot },
+  { path: "/conversations", end: false, label: "Inbox", icon: Inbox },
+  { path: "/contacts", end: false, label: "Contacts", icon: Users },
+  { path: "/stats", end: false, label: "Stats", icon: BarChart3 },
+  { path: "/settings", end: false, label: "Settings", icon: Settings },
+] as const;
+
+function isActive(path: string, end: boolean, current: string) {
+  if (end) return current === "/" || current === "";
+  return current === path || current.startsWith(path + "/");
+}
+
+/** Dashboard layout: sidebar on desktop, bottom nav on mobile. Apple/Linear style. */
+export function AppShell() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const pathname = location.pathname;
+
+  return (
+    <div className="flex h-screen flex-col bg-background md:flex-row">
+      {/* Desktop sidebar */}
+      <aside className="hidden w-56 flex-shrink-0 border-r border-border bg-card md:flex md:flex-col">
+        <div className="flex h-14 items-center border-b border-border px-4">
+          <span className="text-lg font-semibold tracking-tight">NOTSENT</span>
+        </div>
+        <nav className="flex-1 space-y-0.5 p-2">
+          {navItems.map(({ path, end, label, icon: Icon }) => {
+            const active = isActive(path, end, pathname);
+            return (
+              <Button
+                key={path}
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full justify-start gap-3 font-normal",
+                  active && "bg-accent text-accent-foreground"
+                )}
+                onClick={() => navigate(path)}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </Button>
+            );
+          })}
+        </nav>
+      </aside>
+
+      {/* Main content — padding for most pages; full-bleed for conversation thread */}
+      <main className="flex flex-1 flex-col overflow-hidden md:min-w-0">
+        <div
+          className={cn(
+            "flex-1 flex flex-col min-h-0 overflow-hidden",
+            pathname.startsWith("/chat/")
+              ? "py-0"
+              : "overflow-y-auto py-6 sm:py-8 lg:py-10"
+          )}
+        >
+          <Outlet />
+        </div>
+
+        {/* Mobile bottom nav */}
+        <nav
+          className="flex items-center justify-around border-t border-border bg-card px-2 py-2 safe-bottom md:hidden"
+          role="tablist"
+          aria-label="Main navigation"
+        >
+          {navItems.map(({ path, end, label, icon: Icon }) => {
+            const active = isActive(path, end, pathname);
+            return (
+              <Button
+                key={path}
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "flex flex-col gap-0.5 rounded-lg",
+                  active && "bg-accent text-accent-foreground"
+                )}
+                onClick={() => navigate(path)}
+                aria-current={active ? "page" : undefined}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="text-[10px]">{label}</span>
+              </Button>
+            );
+          })}
+        </nav>
+      </main>
+    </div>
+  );
+}
