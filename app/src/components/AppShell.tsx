@@ -1,7 +1,6 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { MessageCircle, Bot, Inbox, Users, BarChart3, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 
 const navItems = [
   { path: "/", end: true, label: "Chats", icon: MessageCircle },
@@ -17,7 +16,6 @@ function isActive(path: string, end: boolean, current: string) {
   return current === path || current.startsWith(path + "/");
 }
 
-/** Dashboard layout: sidebar on desktop, bottom nav on mobile. Apple/Linear style. */
 export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -25,69 +23,86 @@ export function AppShell() {
 
   return (
     <div className="flex h-screen flex-col bg-background md:flex-row">
-      {/* Desktop sidebar */}
-      <aside className="hidden w-56 flex-shrink-0 border-r border-border bg-card md:flex md:flex-col">
-        <div className="flex h-14 items-center border-b border-border px-4">
-          <span className="text-lg font-semibold tracking-tight">NOTSENT</span>
+      {/* Desktop sidebar — Linear style */}
+      <aside className="hidden w-52 flex-shrink-0 border-r border-border bg-background md:flex md:flex-col">
+        <div className="flex h-14 items-center px-5 border-b border-border">
+          <span className="text-sm font-semibold tracking-tight text-foreground">NOTSENT</span>
         </div>
-        <nav className="flex-1 space-y-0.5 p-2">
+        <nav className="flex-1 p-2 space-y-0.5">
           {navItems.map(({ path, end, label, icon: Icon }) => {
             const active = isActive(path, end, pathname);
             return (
-              <Button
+              <button
                 key={path}
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "w-full justify-start gap-3 font-normal",
-                  active && "bg-accent text-accent-foreground"
-                )}
+                type="button"
                 onClick={() => navigate(path)}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
+                  active
+                    ? "bg-secondary text-foreground font-medium"
+                    : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                )}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4 w-4 flex-shrink-0" />
                 {label}
-              </Button>
+              </button>
             );
           })}
         </nav>
       </aside>
 
-      {/* Main content — padding for most pages; full-bleed for conversation thread */}
+      {/* Main content */}
       <main className="flex flex-1 flex-col overflow-hidden md:min-w-0">
         <div
           className={cn(
             "flex-1 flex flex-col min-h-0 overflow-hidden",
             pathname.startsWith("/chat/")
               ? "py-0"
-              : "overflow-y-auto py-6 sm:py-8 lg:py-10"
+              : "overflow-y-auto"
           )}
         >
           <Outlet />
         </div>
 
-        {/* Mobile bottom nav */}
+        {/* Mobile bottom nav — iOS style */}
         <nav
-          className="flex items-center justify-around border-t border-border bg-card px-2 py-2 safe-bottom md:hidden"
+          className="flex items-end justify-around border-t border-border bg-background px-1 pt-2 pb-2 safe-bottom md:hidden"
           role="tablist"
           aria-label="Main navigation"
         >
           {navItems.map(({ path, end, label, icon: Icon }) => {
             const active = isActive(path, end, pathname);
             return (
-              <Button
+              <button
                 key={path}
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  "flex flex-col gap-0.5 rounded-lg",
-                  active && "bg-accent text-accent-foreground"
-                )}
-                onClick={() => navigate(path)}
+                type="button"
+                role="tab"
                 aria-current={active ? "page" : undefined}
+                onClick={() => navigate(path)}
+                className="flex flex-col items-center gap-1 min-w-[48px] py-1 px-2"
               >
-                <Icon className="h-5 w-5" />
-                <span className="text-[10px]">{label}</span>
-              </Button>
+                <span
+                  className={cn(
+                    "flex items-center justify-center rounded-xl px-3 py-1.5 transition-colors",
+                    active ? "bg-secondary" : "bg-transparent"
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      "h-5 w-5 transition-colors",
+                      active ? "text-foreground" : "text-muted-foreground"
+                    )}
+                  />
+                </span>
+                <span
+                  className={cn(
+                    "text-[10px] font-medium leading-none tracking-tight",
+                    active ? "text-foreground" : "text-muted-foreground"
+                  )}
+                >
+                  {label}
+                </span>
+              </button>
             );
           })}
         </nav>

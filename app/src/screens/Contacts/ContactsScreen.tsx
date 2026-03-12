@@ -8,8 +8,6 @@ import {
 } from "@/lib/storage";
 import { PageLayout } from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserPlus, Trash2 } from "lucide-react";
 
 function getInitial(name: string): string {
@@ -56,100 +54,97 @@ export function ContactsScreen() {
       title="Contacts"
       right={
         <Button
-          variant={showForm ? "ghost" : "default"}
+          variant={showForm ? "ghost" : "outline"}
           size="sm"
+          className="h-8 gap-1.5 text-xs"
           onClick={() => setShowForm((s) => !s)}
         >
-          {showForm ? "Cancel" : "Add"}
+          {showForm ? "Cancel" : (
+            <>
+              <UserPlus className="h-3.5 w-3.5" />
+              Add
+            </>
+          )}
         </Button>
       }
     >
-      <p className="mb-6 text-sm text-muted-foreground">
-        People NOTSENT protects you from texting. Add someone to start a thread in Chats.
+      <p className="text-sm text-muted-foreground -mt-1">
+        People NOTSENT protects you from texting impulsively.
       </p>
 
       {showForm && (
-        <Card className="mb-8 rounded-xl shadow-card">
-          <CardHeader>
-            <CardTitle className="text-base">New contact</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAdd} className="space-y-3">
-              <Input
-                placeholder="Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoComplete="name"
-              />
-              <Input
-                type="tel"
-                placeholder="Phone number"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                autoComplete="tel"
-              />
-              {error && (
-                <p className="text-sm text-destructive">{error}</p>
-              )}
-              <Button type="submit" className="w-full">
-                Add contact
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          <p className="text-sm font-medium text-foreground">New contact</p>
+          <form onSubmit={handleAdd} className="space-y-2">
+            <input
+              type="text"
+              placeholder="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoComplete="name"
+              className="w-full h-10 rounded-lg bg-secondary border-0 px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring/30 transition-shadow"
+            />
+            <input
+              type="tel"
+              placeholder="Phone number"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              autoComplete="tel"
+              className="w-full h-10 rounded-lg bg-secondary border-0 px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring/30 transition-shadow"
+            />
+            {error && <p className="text-xs text-destructive">{error}</p>}
+            <Button type="submit" className="w-full h-10">
+              Add contact
+            </Button>
+          </form>
+        </div>
       )}
 
-      <Card className="rounded-xl shadow-card">
-        <CardHeader>
-          <CardTitle className="text-base">
-            Flagged contacts ({contacts.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {contacts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <p className="text-sm text-muted-foreground">No contacts yet.</p>
-              <Button
-                className="mt-3 gap-2"
-                onClick={() => setShowForm(true)}
-              >
-                <UserPlus className="h-4 w-4" />
-                Add your first contact
-              </Button>
-            </div>
-          ) : (
-            <ul className="space-y-1">
-              {contacts.map((c) => (
-                <li
-                  key={c.id}
-                  className="flex items-center gap-3 rounded-lg border border-border p-3"
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1.5 px-1">
+          Flagged ({contacts.length})
+        </p>
+        {contacts.length === 0 ? (
+          <div className="rounded-xl border border-border bg-card flex flex-col items-center justify-center py-10 text-center px-4">
+            <p className="text-sm text-muted-foreground mb-3">No contacts yet.</p>
+            <Button
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setShowForm(true)}
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              Add first contact
+            </Button>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border">
+            {contacts.map((c) => (
+              <div key={c.id} className="flex items-center gap-3 px-4 py-3">
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-foreground">
+                  {getInitial(c.name)}
+                </div>
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 text-left"
+                  onClick={() => navigate(`/chat/${c.id}`)}
                 >
-                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
-                    {getInitial(c.name)}
-                  </div>
-                  <button
-                    type="button"
-                    className="min-w-0 flex-1 text-left hover:opacity-80"
-                    onClick={() => navigate(`/chat/${c.id}`)}
-                  >
-                    <p className="truncate font-medium">{c.name}</p>
-                    <p className="truncate text-sm text-muted-foreground">{c.phoneNumber}</p>
-                  </button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-destructive hover:bg-destructive/10"
-                    onClick={() => handleRemove(c.id)}
-                    aria-label="Remove contact"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+                  <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{c.phoneNumber}</p>
+                </button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
+                  onClick={() => handleRemove(c.id)}
+                  aria-label="Remove contact"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </PageLayout>
   );
 }

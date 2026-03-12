@@ -1,9 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Trash2, Send } from "lucide-react";
+import { Trash2, Send, ArrowLeft, ShieldCheck, HeartCrack } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   getFlaggedContacts,
@@ -47,15 +45,12 @@ export function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [intervention, setIntervention] = useState<InterventionState | null>(
-    null
-  );
+  const [intervention, setIntervention] = useState<InterventionState | null>(null);
   const threadEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const socket = useConversationSocketOptional();
   const liveMessages = intervention ? socket?.getMessages(intervention.sessionId) : undefined;
-  const liveReply =
-    liveMessages?.filter((m) => m.role === "assistant").pop()?.content ?? null;
+  const liveReply = liveMessages?.filter((m) => m.role === "assistant").pop()?.content ?? null;
 
   function refreshSessions() {
     if (contactId) setSessions(getSessionsForContact(contactId));
@@ -151,8 +146,7 @@ export function ChatScreen() {
             ? {
                 ...prev,
                 loading: false,
-                error:
-                  err instanceof Error ? err.message : "Something went wrong",
+                error: err instanceof Error ? err.message : "Something went wrong",
                 reply: prev.reply || CANNED_REPLY,
               }
             : null
@@ -186,8 +180,8 @@ export function ChatScreen() {
   if (!contactId || !contact) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center p-6">
-        <p className="text-muted-foreground">Contact not found.</p>
-        <Button variant="link" className="mt-2" onClick={() => navigate("/")}>
+        <p className="text-sm text-muted-foreground">Contact not found.</p>
+        <Button variant="ghost" className="mt-2 text-sm" onClick={() => navigate("/")}>
           Back to Messages
         </Button>
       </div>
@@ -206,125 +200,156 @@ export function ChatScreen() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
-      {/* Thread header */}
-      <header className="flex flex-shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-4 py-3">
-        <span className="min-w-0 truncate text-base font-semibold">
-          {contact.name}
-        </span>
+      {/* Header */}
+      <header className="flex flex-shrink-0 items-center h-14 gap-3 border-b border-border bg-background px-4">
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 text-muted-foreground hover:text-destructive"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          onClick={() => navigate("/")}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground truncate">{contact.name}</p>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive"
           onClick={() => setShowDeleteConfirm(true)}
-          title="Delete conversation"
         >
           <Trash2 className="h-4 w-4" />
         </Button>
       </header>
 
-      {/* Delete confirm */}
+      {/* Delete confirm modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="w-full max-w-sm rounded-xl shadow-card">
-            <CardContent className="p-6 pt-6">
-              <p className="text-sm text-muted-foreground">
-                Delete this conversation? Messages will be removed from this
-                thread only.
-              </p>
-              <div className="mt-4 flex justify-end gap-2">
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowDeleteConfirm(false)}
-                >
-                  Cancel
-                </Button>
-                <Button variant="destructive" onClick={handleDeleteChat}>
-                  Delete
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-card border border-border p-5 shadow-lg">
+            <p className="text-sm font-medium text-foreground mb-1">Delete conversation?</p>
+            <p className="text-sm text-muted-foreground">
+              Messages will be removed from this thread only.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={handleDeleteChat}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Message thread */}
+      {/* Thread */}
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-content p-6 space-y-4">
+        <div className="px-4 py-5 space-y-3 max-w-xl mx-auto">
+          {threadMessages.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary mb-3">
+                <ShieldCheck className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium text-foreground mb-1">Protected thread</p>
+              <p className="text-sm text-muted-foreground max-w-xs">
+                Type what you want to send {contact.name}. NOTSENT will intercept before it goes.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate(`/closure/${contact.id}`)}
+                className="mt-5 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <HeartCrack className="h-3.5 w-3.5" />
+                Get closure instead
+              </button>
+            </div>
+          )}
+
           {threadMessages.map((m) => (
             <div
               key={m.id}
-              className={cn("max-w-md", m.outcome === "sent" && "ml-auto")}
+              className={cn(
+                "flex",
+                m.outcome === "sent" ? "justify-end" : "justify-start"
+              )}
             >
               <div
                 className={cn(
-                  "rounded-xl border border-border bg-card p-3 shadow-card",
-                  m.outcome === "sent" &&
-                    "bg-primary border-primary text-primary-foreground"
+                  "max-w-[78%] rounded-2xl px-3.5 py-2.5",
+                  m.outcome === "sent"
+                    ? "bg-primary text-primary-foreground rounded-tr-sm"
+                    : "bg-secondary text-foreground rounded-tl-sm"
                 )}
               >
-                <span className="block text-sm">{m.text}</span>
-                <span className="mt-1 flex items-center gap-1.5 text-xs opacity-85">
+                <p className="text-sm leading-relaxed">{m.text}</p>
+                <div className="mt-1 flex items-center gap-1.5">
                   {m.outcome !== "sent" && (
-                    <span className="italic">Not sent</span>
+                    <span className="text-[11px] opacity-60 italic">Not sent</span>
                   )}
-                  <span>
+                  <span className="text-[11px] opacity-55">
                     {new Date(m.timestamp).toLocaleTimeString([], {
                       hour: "numeric",
                       minute: "2-digit",
                     })}
                   </span>
-                </span>
+                </div>
               </div>
             </div>
           ))}
 
-          {/* In-thread review (intervention) */}
+          {/* Intervention card */}
           {intervention && (
-            <Card className="w-full max-w-md rounded-xl border border-border shadow-card overflow-hidden">
-              <CardContent className="p-4 space-y-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <div className="rounded-2xl border border-border bg-card overflow-hidden mt-2">
+              <div className="px-4 py-3 border-b border-border bg-secondary/40">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                   You were about to send
                 </p>
-                <p className="text-sm font-medium">"{intervention.messageAttempted}"</p>
-                <div className="rounded-xl bg-muted/60 p-3 min-h-[2rem]">
-                  {intervention.loading && !intervention.reply && !liveReply && (
-                    <p className="text-sm text-muted-foreground italic">
-                      NOTSENT is thinking…
-                    </p>
-                  )}
-                  {(intervention.reply || liveReply) && (
-                    <p className="text-sm whitespace-pre-wrap text-foreground">
-                      {liveReply ?? intervention.reply}
-                    </p>
-                  )}
-                  {intervention.error && (
-                    <p className="text-sm text-destructive mt-1">
-                      {intervention.error}
-                    </p>
-                  )}
-                  <div ref={threadEndRef} />
-                </div>
-                {!intervention.loading && (
-                  <div className="flex gap-2 pt-1">
-                    <Button
-                      onClick={() => handleOutcome("intercepted")}
-                      disabled={intervention.actionLoading}
-                      className="flex-1 rounded-xl"
-                    >
-                      I won't send it
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => handleOutcome("sent")}
-                      disabled={intervention.actionLoading}
-                      className="flex-1 rounded-xl"
-                    >
-                      Send anyway
-                    </Button>
-                  </div>
+                <p className="text-sm font-medium text-foreground mt-1">
+                  "{intervention.messageAttempted}"
+                </p>
+              </div>
+              <div className="px-4 py-3 min-h-[3.5rem]">
+                {intervention.loading && !intervention.reply && !liveReply ? (
+                  <p className="text-sm text-muted-foreground italic">Thinking…</p>
+                ) : (
+                  <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                    {liveReply ?? intervention.reply}
+                  </p>
                 )}
-              </CardContent>
-            </Card>
+                {intervention.error && (
+                  <p className="text-sm text-destructive mt-1">{intervention.error}</p>
+                )}
+                <div ref={threadEndRef} />
+              </div>
+              {!intervention.loading && (
+                <div className="flex gap-2 px-4 pb-4 pt-1">
+                  <Button
+                    onClick={() => handleOutcome("intercepted")}
+                    disabled={intervention.actionLoading}
+                    className="flex-1 h-10 text-sm"
+                  >
+                    Won't send it
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleOutcome("sent")}
+                    disabled={intervention.actionLoading}
+                    className="flex-1 h-10 text-sm"
+                  >
+                    Send anyway
+                  </Button>
+                </div>
+              )}
+            </div>
           )}
         </div>
         {!intervention && <div ref={threadEndRef} />}
@@ -333,27 +358,36 @@ export function ChatScreen() {
       {/* Compose */}
       <form
         onSubmit={handleSend}
-        className="flex flex-shrink-0 flex-col gap-2 border-t border-border bg-card/80 px-4 py-3 backdrop-blur"
+        className="flex flex-shrink-0 items-end gap-2 border-t border-border bg-background px-4 py-3"
       >
-        {error && (
-          <p className="text-sm text-destructive">{error}</p>
-        )}
-        <div className="flex items-end gap-2">
-          <Input
-            placeholder="Message"
+        {error && <p className="text-xs text-destructive absolute">{error}</p>}
+        <div className="flex flex-1 items-center gap-2">
+          <input
+            type="text"
+            placeholder={`Message ${contact.name}…`}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={sending}
-            className="flex-1 min-h-11 rounded-2xl border-border bg-muted/50 focus-visible:ring-2"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend(e as unknown as React.FormEvent);
+              }
+            }}
+            className="flex-1 h-10 rounded-full bg-secondary px-4 text-sm text-foreground placeholder:text-muted-foreground border-0 outline-none focus:ring-2 focus:ring-ring/30 transition-shadow"
           />
-          <Button
+          <button
             type="submit"
-            size="icon"
             disabled={sending || !input.trim()}
-            className="h-11 w-11 flex-shrink-0 rounded-full"
+            className={cn(
+              "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition-colors",
+              input.trim()
+                ? "bg-primary text-primary-foreground hover:bg-primary/85"
+                : "bg-secondary text-muted-foreground"
+            )}
           >
             <Send className="h-4 w-4" />
-          </Button>
+          </button>
         </div>
       </form>
     </div>

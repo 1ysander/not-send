@@ -20,6 +20,7 @@ import {
 import { streamChat } from "../src/ai/index.js";
 import { buildInterventionSystemPrompt } from "../src/prompts/intervention.js";
 import { buildClosureSystemPrompt } from "../src/prompts/closure.js";
+import { analyzeRisk } from "./riskAnalysis.js";
 
 const SUPPORT_SYSTEM_PROMPT = `You are a calm, supportive AI for NOTSENT — an app that helps people avoid texting their ex in the heat of the moment. The user is talking to you for general support about their breakup, urges to reach out, or moving on. Be warm and brief. Ask questions. Don't lecture. Help them process what they're feeling.`;
 
@@ -115,10 +116,13 @@ export async function streamIntervention(
   if (history.length === 0 && typeof params.deviceId === "string") {
     history = getRecentHistoryForDevice(params.deviceId, 12);
   }
+  const { urgency, sentiment } = analyzeRisk(params.messageAttempted);
   const systemPrompt = buildInterventionSystemPrompt(params.messageAttempted, {
     userContext,
     conversationHistory: history,
     maxHistoryTurns: 10,
+    urgency,
+    sentiment,
   });
   const chatMessages = params.messages.map((m) => ({
     role: m.role as "user" | "assistant",

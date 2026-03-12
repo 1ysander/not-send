@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { getStats } from "@/api";
 import { getSessions } from "@/lib/storage";
 import { PageLayout } from "@/components/PageLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 export function StatsScreen() {
   const [interceptions, setInterceptions] = useState(0);
   const [neverSent, setNeverSent] = useState(0);
@@ -36,34 +36,22 @@ export function StatsScreen() {
 
   return (
     <PageLayout title="Stats">
-      <p className="mb-8 text-sm text-muted-foreground">
+      <p className="text-sm text-muted-foreground -mt-1">
         How many times NOTSENT helped you pause before sending.
       </p>
-      <div className="grid gap-6 sm:grid-cols-2">
-        <Card className="rounded-xl shadow-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Messages stopped
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold tracking-tight">{interceptions}</p>
-          </CardContent>
-        </Card>
-        <Card className="rounded-xl shadow-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Never sent
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold tracking-tight">{neverSent}</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground font-medium mb-2">Messages stopped</p>
+          <p className="text-4xl font-semibold tracking-tight text-foreground">{interceptions}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground font-medium mb-2">Never sent</p>
+          <p className="text-4xl font-semibold tracking-tight text-foreground">{neverSent}</p>
+        </div>
       </div>
       {!usedApi && (
-        <p className="mt-4 text-xs text-muted-foreground">
-          Showing local count. Start the backend for synced stats.
+        <p className="text-xs text-muted-foreground">
+          Local count only. Start the backend for synced stats.
         </p>
       )}
     </PageLayout>

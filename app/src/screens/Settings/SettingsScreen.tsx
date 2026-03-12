@@ -20,10 +20,61 @@ import type { UserContext } from "@/types";
 import { PageLayout } from "@/components/PageLayout";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LogOut, Check, UserPlus } from "lucide-react";
+import { LogOut, Check, ChevronRight, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground px-1 mb-1.5">
+      {children}
+    </p>
+  );
+}
+
+function SettingsGroup({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border">
+      {children}
+    </div>
+  );
+}
+
+function SettingsRow({
+  label,
+  description,
+  right,
+  onClick,
+  destructive,
+}: {
+  label: string;
+  description?: string;
+  right?: React.ReactNode;
+  onClick?: () => void;
+  destructive?: boolean;
+}) {
+  const Tag = onClick ? "button" : "div";
+  return (
+    <Tag
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center gap-3 px-4 py-3.5 text-left",
+        onClick && "hover:bg-secondary/50 active:bg-secondary transition-colors",
+        destructive && "text-destructive"
+      )}
+    >
+      <div className="flex-1 min-w-0">
+        <p className={cn("text-sm font-medium", destructive ? "text-destructive" : "text-foreground")}>
+          {label}
+        </p>
+        {description && (
+          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+        )}
+      </div>
+      {right ?? (onClick && !destructive && <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />)}
+    </Tag>
+  );
+}
 
 export function SettingsScreen() {
   const [contacts] = useState(getFlaggedContacts());
@@ -87,56 +138,66 @@ export function SettingsScreen() {
 
   return (
     <PageLayout title="Settings">
-      <div className="space-y-8">
-        <Card className="rounded-xl shadow-card">
-          <CardHeader>
-            <CardTitle className="text-base">Account</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {user ? (
-              <>
-                <div className="flex items-center gap-3">
-                  {user.picture && (
-                    <img
-                      src={user.picture}
-                      alt=""
-                      className="h-10 w-10 rounded-full object-cover"
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">{user.name}</p>
-                    <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+      {/* Account */}
+      <div>
+        <SectionLabel>Account</SectionLabel>
+        <SettingsGroup>
+          {user ? (
+            <>
+              <div className="flex items-center gap-3 px-4 py-3.5">
+                {user.picture ? (
+                  <img
+                    src={user.picture}
+                    alt=""
+                    className="h-9 w-9 rounded-full object-cover flex-shrink-0"
+                  />
+                ) : (
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary flex-shrink-0">
+                    <span className="text-sm font-semibold text-foreground">
+                      {(user.name ?? "?")[0].toUpperCase()}
+                    </span>
                   </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                 </div>
-                <Button variant="ghost" size="sm" onClick={signOut} className="gap-2">
-                  <LogOut className="h-4 w-4" />
-                  Sign out
-                </Button>
-              </>
-            ) : (
-              <Button onClick={() => navigate("/login")}>Sign in with Google</Button>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-xl shadow-card">
-          <CardHeader>
-            <CardTitle className="text-base">Context for AI</CardTitle>
-            <CardDescription>
-              Helps the AI reference your situation during interventions.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <textarea
-              placeholder="e.g. We broke up 2 months ago…"
-              value={breakupSummary}
-              onChange={(e) => setBreakupSummary(e.target.value)}
-              rows={3}
-              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              </div>
+              <SettingsRow
+                label="Sign out"
+                right={<LogOut className="h-4 w-4 text-muted-foreground" />}
+                onClick={signOut}
+              />
+            </>
+          ) : (
+            <SettingsRow
+              label="Sign in with Google"
+              onClick={() => navigate("/login")}
             />
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">No contact (days)</label>
-              <Input
+          )}
+        </SettingsGroup>
+      </div>
+
+      {/* AI Context */}
+      <div>
+        <SectionLabel>AI Context</SectionLabel>
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Helps AI reference your situation during interventions.
+          </p>
+          <textarea
+            placeholder="e.g. We broke up 2 months ago after a 3-year relationship…"
+            value={breakupSummary}
+            onChange={(e) => setBreakupSummary(e.target.value)}
+            rows={3}
+            className="w-full rounded-lg bg-secondary border-0 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring/30 resize-none transition-shadow"
+          />
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <label className="text-xs font-medium text-muted-foreground block mb-1">
+                No contact (days)
+              </label>
+              <input
                 type="number"
                 min={0}
                 placeholder="14"
@@ -144,79 +205,81 @@ export function SettingsScreen() {
                 onChange={(e) =>
                   setNoContactDays(e.target.value === "" ? "" : parseInt(e.target.value, 10))
                 }
-                className="mt-1 max-w-[88px]"
+                className="w-20 h-9 rounded-lg bg-secondary border-0 px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring/30 transition-shadow"
               />
             </div>
-            <Button variant={saved ? "secondary" : "default"} size="sm" onClick={handleSaveContext}>
-              {saved ? <><Check className="h-4 w-4 mr-1" /> Saved</> : "Save context"}
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-xl shadow-card">
-          <CardHeader>
-            <CardTitle className="text-base">Backend</CardTitle>
-            <CardDescription>
-              Check connection for AI chat and interventions.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="secondary" size="sm" onClick={handleCheckBackend}>
-                Check connection
-              </Button>
-              {backendStatus && (
-                <span
-                  className={cn(
-                    "text-sm",
-                    backendStatus.ok ? "text-primary" : "text-destructive"
-                  )}
-                >
-                  {backendStatus.ok ? "✓ Connected" : `✗ ${backendStatus.error}`}
-                </span>
+            <Button
+              variant={saved ? "secondary" : "default"}
+              size="sm"
+              onClick={handleSaveContext}
+              className="flex-shrink-0 gap-1.5"
+            >
+              {saved ? (
+                <>
+                  <Check className="h-3.5 w-3.5" />
+                  Saved
+                </>
+              ) : (
+                "Save"
               )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={handleLoadPartnerFromBackend}>
-                Load partner from backend
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleSyncPartnerToBackend}>
-                {partnerSynced ? "✓ Synced" : "Save partner to backend"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-xl shadow-card">
-          <CardHeader>
-            <CardTitle className="text-base">Contacts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Button
-              variant="outline"
-              className="w-full justify-between"
-              onClick={() => navigate("/contacts")}
-            >
-              <span>Manage contacts</span>
-              <UserPlus className="h-4 w-4" />
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+      </div>
 
-        <Card className="rounded-xl border-destructive/50 shadow-card">
-          <CardContent className="pt-6">
-            <Button
-              variant="ghost"
-              className="w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={handleRedoOnboarding}
-            >
-              Redo onboarding
-            </Button>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Clears all contacts and returns to setup.
-            </p>
-          </CardContent>
-        </Card>
+      {/* Contacts */}
+      <div>
+        <SectionLabel>Contacts</SectionLabel>
+        <SettingsGroup>
+          <SettingsRow
+            label="Manage contacts"
+            description={`${contacts.length} contact${contacts.length !== 1 ? "s" : ""} flagged`}
+            onClick={() => navigate("/contacts")}
+          />
+        </SettingsGroup>
+      </div>
+
+      {/* Backend */}
+      <div>
+        <SectionLabel>Connection</SectionLabel>
+        <SettingsGroup>
+          <SettingsRow
+            label="Check backend"
+            right={
+              backendStatus ? (
+                <span className={cn("text-xs font-medium", backendStatus.ok ? "text-brand" : "text-destructive")}>
+                  {backendStatus.ok ? "Connected" : "Offline"}
+                </span>
+              ) : (
+                <Activity className="h-4 w-4 text-muted-foreground" />
+              )
+            }
+            onClick={handleCheckBackend}
+          />
+          <SettingsRow
+            label="Load partner from backend"
+            right={<ChevronRight className="h-4 w-4 text-muted-foreground" />}
+            onClick={handleLoadPartnerFromBackend}
+          />
+          <SettingsRow
+            label={partnerSynced ? "Synced" : "Save partner to backend"}
+            right={partnerSynced ? <Check className="h-4 w-4 text-brand" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+            onClick={handleSyncPartnerToBackend}
+          />
+        </SettingsGroup>
+      </div>
+
+      {/* Danger zone */}
+      <div>
+        <SectionLabel>Danger zone</SectionLabel>
+        <SettingsGroup>
+          <SettingsRow
+            label="Redo onboarding"
+            description="Clears all contacts and returns to setup"
+            destructive
+            onClick={handleRedoOnboarding}
+          />
+        </SettingsGroup>
       </div>
     </PageLayout>
   );

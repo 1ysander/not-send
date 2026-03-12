@@ -4,10 +4,8 @@ import { streamReviewResponse, recordOutcome } from "@/core";
 import { webReviewTransport } from "@/adapters/webTransport";
 import { updateLocalSessionOutcome, getDeviceId, getUserContext } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
-import { Container } from "@/components/Container";
-import { ArrowLeft, AlertTriangle } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
-/** Review warning: AI read-over before send. Messaging-style container, not a form. */
 export function InterventionChat() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messageAttempted, setMessageAttempted] = useState<string>("");
@@ -98,113 +96,90 @@ export function InterventionChat() {
     }
   }
 
-  if (error && !sessionId) {
-    return (
-      <Container>
-        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
-          <p className="text-destructive font-medium">{error}</p>
-          <Button className="mt-4 rounded-xl" onClick={goBack}>
-            Back to Messages
-          </Button>
-        </div>
-      </Container>
-    );
-  }
+  const errorOnly = error && !sessionId;
+  const localError = error && sessionId?.startsWith("local_");
 
-  if (error && sessionId?.startsWith("local_")) {
+  if (errorOnly || localError) {
     return (
-      <Container>
-        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
-          <p className="text-destructive font-medium">{error}</p>
-          <Button
-            className="mt-4 rounded-xl"
-            onClick={() => {
-              updateLocalSessionOutcome(sessionId, "intercepted");
-              goBack();
-            }}
-          >
-            Back to Messages
-          </Button>
-        </div>
-      </Container>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background px-6 text-center">
+        <p className="text-sm text-destructive font-medium mb-4">{error}</p>
+        <Button
+          onClick={() => {
+            if (localError) updateLocalSessionOutcome(sessionId!, "intercepted");
+            goBack();
+          }}
+        >
+          Back to Messages
+        </Button>
+      </div>
     );
   }
 
   return (
-    <Container>
-      <header className="flex items-center gap-2 mb-6">
+    <div className="flex flex-col min-h-screen bg-background">
+      {/* Header */}
+      <header className="flex items-center h-14 px-4 border-b border-border">
         <Button
           variant="ghost"
           size="icon"
           onClick={goBack}
           aria-label="Back"
-          className="rounded-full"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground mr-2"
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-lg font-semibold tracking-tight">Review</h1>
+        <p className="text-sm font-semibold text-foreground">Intervention</p>
       </header>
 
-      {/* Warning card: what you were about to send */}
-      {messageAttempted && (
-        <div className="rounded-2xl border-l-4 border-l-primary bg-muted/40 p-4 mb-6">
-          <div className="flex gap-2 items-start">
-            <AlertTriangle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                You were about to send
-              </p>
-              <p className="mt-1 text-sm font-medium text-foreground">
-                "{messageAttempted}"
-              </p>
-            </div>
+      <div className="flex-1 overflow-y-auto px-4 py-6 max-w-xl mx-auto w-full space-y-4">
+        {/* Intercepted message */}
+        {messageAttempted && (
+          <div className="rounded-xl border border-border bg-secondary/40 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+              You were about to send
+            </p>
+            <p className="text-sm text-foreground font-medium">"{messageAttempted}"</p>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* AI response */}
-      <div className="rounded-2xl bg-card border border-border p-4 min-h-[8rem]">
-        {loading && !reply && (
-          <p className="text-sm text-muted-foreground italic">
-            NOTSENT is thinking…
+        {/* AI response */}
+        <div className="rounded-xl border border-border bg-card p-4 min-h-[7rem]">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">
+            NOTSENT
           </p>
-        )}
-        {reply && (
-          <>
-            <p className="text-xs font-medium text-muted-foreground mb-2">
-              NOTSENT
-            </p>
-            <p className="text-sm whitespace-pre-wrap text-foreground leading-relaxed">
-              {reply}
-            </p>
-            <div ref={replyEndRef} />
-          </>
-        )}
-        {error && reply && (
-          <p className="mt-2 text-sm text-destructive">{error}</p>
+          {loading && !reply && (
+            <p className="text-sm text-muted-foreground italic">Thinking…</p>
+          )}
+          {reply && (
+            <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{reply}</p>
+          )}
+          {error && reply && (
+            <p className="mt-2 text-sm text-destructive">{error}</p>
+          )}
+          <div ref={replyEndRef} />
+        </div>
+
+        {/* Actions */}
+        {!loading && (
+          <div className="flex gap-3 pt-2">
+            <Button
+              onClick={() => handleOutcome("intercepted")}
+              disabled={actionLoading}
+              className="flex-1 h-11"
+            >
+              Won't send it
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleOutcome("sent")}
+              disabled={actionLoading}
+              className="flex-1 h-11"
+            >
+              Send anyway
+            </Button>
+          </div>
         )}
       </div>
-
-      {/* Actions */}
-      {!loading && (
-        <footer className="mt-8 flex gap-3">
-          <Button
-            onClick={() => handleOutcome("intercepted")}
-            disabled={actionLoading}
-            className="flex-1 rounded-xl"
-          >
-            I won't send it
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => handleOutcome("sent")}
-            disabled={actionLoading}
-            className="flex-1 rounded-xl"
-          >
-            Send anyway
-          </Button>
-        </footer>
-      )}
-    </Container>
+    </div>
   );
 }

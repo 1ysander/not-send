@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { MessageCircle, Bot, Inbox, Users, BarChart3, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/ui/button";
 
 const navItems = [
   { path: "/", end: true, label: "Chats", icon: MessageCircle },

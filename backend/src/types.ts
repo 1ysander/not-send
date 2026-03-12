@@ -6,6 +6,8 @@
 
 export type SessionOutcome = "intercepted" | "sent" | "draft";
 
+export type Sentiment = "distress" | "longing" | "anger" | "neutral";
+
 export interface Session {
   id: string;
   messageAttempted: string;
@@ -20,12 +22,19 @@ export interface ConversationTurn {
   timestamp?: number;
 }
 
+/** Where you usually talk to your ex – used to tailor intervention quality (SMS, IG, etc.). */
+export type ConversationContextType = "sms" | "instagram" | "whatsapp" | "generic";
+
 /** Optional context about the user/breakup for intervention prompts. */
 export interface UserContext {
   /** Free text: how the breakup happened, how long ago, etc. */
   breakupSummary?: string;
+  /** Days since no contact started – used to personalize urgency in prompts. */
+  noContactDays?: number;
   /** Partner's name (ex) for personalization. */
   partnerName?: string;
+  /** Channel (SMS, Instagram, WhatsApp) so content fits the context. */
+  conversationContext?: ConversationContextType;
 }
 
 /** Optional context about the ex for closure flow: simulate their voice without reaching out. */

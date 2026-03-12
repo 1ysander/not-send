@@ -13,7 +13,8 @@ export function MessageBubble({ role, content, timestamp, className }: MessageBu
     <div
       className={cn(
         "flex max-w-[85%] flex-col gap-0.5",
-        role === "user" && "ml-auto"
+        role === "user" && "ml-auto",
+        className
       )}
     >
       <div

@@ -3,17 +3,21 @@ import { useNavigate } from "react-router-dom";
 import { getFlaggedContacts, getSessionsForContact } from "@/lib/storage";
 import { useConversationSocketOptional } from "@/contexts/ConversationSocketContext";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Container } from "@/components/Container";
 import { MessageCircle, Search, UserPlus } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 function getInitial(name: string): string {
-  const n = name.trim();
-  return n ? n[0].toUpperCase() : "?";
+  return name.trim() ? name.trim()[0].toUpperCase() : "?";
 }
 
-/** Inbox: messaging-style list of conversations (not a form). */
+function formatTime(ts: number): string {
+  const now = Date.now();
+  const diff = now - ts;
+  if (diff < 60_000) return "now";
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m`;
+  if (diff < 86_400_000) return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return new Date(ts).toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
 export function ConversationList() {
   const [search, setSearch] = useState("");
   const socket = useConversationSocketOptional();
@@ -21,58 +25,59 @@ export function ConversationList() {
   const contacts = getFlaggedContacts();
   const navigate = useNavigate();
 
-  const filtered =
-    search.trim()
-      ? contacts.filter(
-          (c) =>
-            c.name.toLowerCase().includes(search.toLowerCase()) ||
-            c.phoneNumber.includes(search)
-        )
-      : contacts;
+  const filtered = search.trim()
+    ? contacts.filter(
+        (c) =>
+          c.name.toLowerCase().includes(search.toLowerCase()) ||
+          c.phoneNumber.includes(search)
+      )
+    : contacts;
 
   return (
-    <Container
-      contentClassName="flex flex-col h-full min-h-0"
-      className="flex flex-col"
-    >
-      <header className="flex-shrink-0 pb-4">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          Messages
-        </h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Type here instead of texting them.
-        </p>
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex-shrink-0 px-4 pt-6 pb-3 sm:px-6">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">Messages</h1>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
+            onClick={() => navigate("/contacts")}
+          >
+            <UserPlus className="h-4 w-4" />
+            <span className="text-xs">Add</span>
+          </Button>
+        </div>
         {contacts.length > 0 && (
-          <div className="mt-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-              <Input
-                placeholder="Search conversations…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-10 rounded-xl bg-muted/50 border-0 focus-visible:ring-2"
-                aria-label="Search conversations"
-              />
-            </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full h-9 pl-9 pr-3 rounded-xl bg-secondary text-sm text-foreground placeholder:text-muted-foreground border-0 outline-none focus:ring-2 focus:ring-ring/30 transition-shadow"
+              aria-label="Search conversations"
+            />
           </div>
         )}
-      </header>
+      </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto -mx-6 px-6">
+      {/* List */}
+      <div className="flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="rounded-full bg-muted p-4">
-              <MessageCircle className="h-8 w-8 text-muted-foreground" />
+          <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary mb-4">
+              <MessageCircle className="h-6 w-6 text-muted-foreground" />
             </div>
-            <h2 className="mt-4 text-lg font-medium text-foreground">
-              No conversations yet
-            </h2>
-            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-              Add a contact to start. When you type here, NOTSENT intercepts send
-              and helps you decide before it goes.
+            <p className="text-sm font-medium text-foreground mb-1">No conversations yet</p>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              Add a contact. When you type here, NOTSENT intercepts send and helps you decide.
             </p>
             <Button
-              className="mt-6 gap-2 rounded-xl"
+              size="sm"
+              className="mt-5 gap-2"
               onClick={() => navigate("/contacts")}
             >
               <UserPlus className="h-4 w-4" />
@@ -80,49 +85,34 @@ export function ConversationList() {
             </Button>
           </div>
         ) : (
-          <ul key={updateVersion} className="divide-y divide-border">
+          <ul key={updateVersion}>
             {filtered.map((contact) => {
               const sessions = getSessionsForContact(contact.id);
-              const last =
-                sessions.length > 0
-                  ? [...sessions].sort(
-                      (a, b) => b.timestamp - a.timestamp
-                    )[0]
-                  : null;
-              const preview =
-                last?.messageAttempted?.slice(0, 50) ?? "No messages yet";
-              const time = last
-                ? new Date(last.timestamp).toLocaleTimeString([], {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })
-                : "";
+              const last = sessions.length > 0
+                ? [...sessions].sort((a, b) => b.timestamp - a.timestamp)[0]
+                : null;
+              const preview = last?.messageAttempted?.slice(0, 55) ?? "No messages yet";
+              const truncated = (last?.messageAttempted?.length ?? 0) > 55;
 
               return (
                 <li key={contact.id}>
                   <button
                     type="button"
                     onClick={() => navigate(`/chat/${contact.id}`)}
-                    className={cn(
-                      "flex w-full items-center gap-3 py-3 text-left rounded-xl transition-colors",
-                      "hover:bg-muted/60 active:bg-muted/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                    )}
+                    className="flex w-full items-center gap-3 px-4 py-3.5 sm:px-6 hover:bg-secondary/60 active:bg-secondary transition-colors text-left"
                   >
-                    <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
+                    <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-foreground">
                       {getInitial(contact.name)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-foreground">
-                        {contact.name}
-                      </p>
-                      <p className="truncate text-sm text-muted-foreground">
-                        {preview}
-                        {(last?.messageAttempted?.length ?? 0) > 50 ? "…" : ""}
+                      <p className="text-sm font-semibold text-foreground truncate">{contact.name}</p>
+                      <p className="text-sm text-muted-foreground truncate mt-0.5">
+                        {preview}{truncated ? "…" : ""}
                       </p>
                     </div>
-                    {time && (
+                    {last && (
                       <span className="flex-shrink-0 text-xs text-muted-foreground">
-                        {time}
+                        {formatTime(last.timestamp)}
                       </span>
                     )}
                   </button>
@@ -132,6 +122,6 @@ export function ConversationList() {
           </ul>
         )}
       </div>
-    </Container>
+    </div>
   );
 }

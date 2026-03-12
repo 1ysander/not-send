@@ -1,10 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { getDeviceId, getUserContext } from "@/lib/storage";
 import { streamSupportChat } from "@/api";
-import { PageLayout } from "@/components/PageLayout";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Bot, Send } from "lucide-react";
+import { Send, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
@@ -57,8 +54,7 @@ export function AIChatScreen() {
         ...prev,
         {
           role: "assistant",
-          content:
-            "Sorry, I couldn't connect. Check that the backend is running and try again.",
+          content: "Sorry, I couldn't connect. Check that the backend is running and try again.",
         },
       ]);
     } finally {
@@ -69,49 +65,46 @@ export function AIChatScreen() {
   const isEmpty = messages.length === 0;
 
   return (
-    <PageLayout title="AI Chat">
-      <div className="flex flex-1 flex-col min-h-0">
-        <div className="flex-1 overflow-y-auto p-4">
-          {isEmpty && (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="rounded-full bg-muted p-4">
-                <Bot className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h2 className="mt-4 text-lg font-medium">How can I help you today?</h2>
-              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                Talk to NOTSENT for support — no message is sent to anyone.
-              </p>
+    <div className="flex flex-col h-full bg-background">
+      {/* Header */}
+      <header className="flex items-center h-14 border-b border-border px-4 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-secondary">
+            <Sparkles className="h-3.5 w-3.5 text-foreground" />
+          </div>
+          <p className="text-sm font-semibold text-foreground">AI Support</p>
+        </div>
+      </header>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+        {isEmpty ? (
+          <div className="flex flex-col items-center justify-center h-full py-16 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary mb-4">
+              <Sparkles className="h-6 w-6 text-muted-foreground" />
             </div>
-          )}
-          <div className="space-y-4">
+            <p className="text-sm font-medium text-foreground mb-1">How can I help you?</p>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              Talk openly. No message is sent to anyone.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3 max-w-xl mx-auto">
             {messages.map((m, i) => (
               <div
                 key={i}
-                className={cn(
-                  "flex gap-3",
-                  m.role === "user" && "flex-row-reverse"
-                )}
+                className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}
               >
                 <div
                   className={cn(
-                    "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-medium",
+                    "max-w-[80%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
                     m.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
-                  )}
-                >
-                  {m.role === "user" ? "U" : "A"}
-                </div>
-                <div
-                  className={cn(
-                    "max-w-[85%] rounded-xl px-3 py-2 text-sm shadow-soft",
-                    m.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
+                      ? "bg-primary text-primary-foreground rounded-tr-sm"
+                      : "bg-secondary text-foreground rounded-tl-sm"
                   )}
                 >
                   {m.role === "assistant" && !m.content && loading ? (
-                    <span className="text-muted-foreground">Thinking…</span>
+                    <span className="text-muted-foreground italic text-xs">Thinking…</span>
                   ) : (
                     <span className="whitespace-pre-wrap">{m.content}</span>
                   )}
@@ -119,27 +112,45 @@ export function AIChatScreen() {
               </div>
             ))}
           </div>
-          {error && (
-            <p className="mt-2 text-sm text-destructive">{error}</p>
-          )}
-          <div ref={endRef} />
-        </div>
-        <form
-          onSubmit={handleSubmit}
-          className="flex gap-2 border-t border-border bg-card/50 p-3 backdrop-blur"
-        >
-          <Input
-            placeholder="Message"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            disabled={loading}
-            className="flex-1"
-          />
-          <Button type="submit" size="icon" disabled={loading || !input.trim()}>
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
+        )}
+        {error && (
+          <p className="mt-2 text-xs text-destructive text-center">{error}</p>
+        )}
+        <div ref={endRef} />
       </div>
-    </PageLayout>
+
+      {/* Input */}
+      <form
+        onSubmit={handleSubmit}
+        className="flex-shrink-0 flex items-center gap-2 border-t border-border bg-background px-4 py-3"
+      >
+        <input
+          type="text"
+          placeholder="Message"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          disabled={loading}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSubmit(e as unknown as React.FormEvent);
+            }
+          }}
+          className="flex-1 h-10 rounded-full bg-secondary px-4 text-sm text-foreground placeholder:text-muted-foreground border-0 outline-none focus:ring-2 focus:ring-ring/30 transition-shadow disabled:opacity-50"
+        />
+        <button
+          type="submit"
+          disabled={loading || !input.trim()}
+          className={cn(
+            "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition-colors",
+            input.trim() && !loading
+              ? "bg-primary text-primary-foreground hover:bg-primary/85"
+              : "bg-secondary text-muted-foreground"
+          )}
+        >
+          <Send className="h-4 w-4" />
+        </button>
+      </form>
+    </div>
   );
 }

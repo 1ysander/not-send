@@ -2,8 +2,8 @@ import { useMemo, useState, useCallback, useEffect } from "react";
 import {
   getFlaggedContacts,
   getSessionsForContact,
-  type FlaggedContact,
 } from "@/lib/storage";
+import type { FlaggedContact } from "@/types";
 import type { LocalSession } from "@/types";
 
 export interface ConversationItem {
