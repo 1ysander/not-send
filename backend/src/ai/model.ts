@@ -11,6 +11,7 @@ import { getCannedInterventionReply } from "./canned.js";
 const DEFAULT_MAX_TOKENS = 1024;
 const INTERVENTION_MODEL_ANTHROPIC = "claude-sonnet-4-20250514";
 const INTERVENTION_MODEL_OPENAI = "gpt-4o-mini";
+const INTERVENTION_MODEL_GEMINI = "gemini-flash-latest";
 
 /**
  * Stream a reply using the configured provider (Anthropic, OpenAI, or canned).
@@ -25,7 +26,7 @@ export async function streamChat(
     messageAttempted?: string;
   },
   onChunk: StreamChunkCallback
-): Promise<{ provider: "anthropic" | "openai" | "canned" }> {
+): Promise<{ provider: "anthropic" | "openai" | "gemini" | "canned" }> {
   const config = getAIConfig();
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
 
@@ -51,6 +52,16 @@ export async function streamChat(
   if (config.provider === "openai" && config.openaiApiKey) {
     return streamOpenAI(
       config.openaiApiKey,
+      options.systemPrompt,
+      options.messages,
+      maxTokens,
+      onChunk
+    );
+  }
+
+  if (config.provider === "gemini" && config.geminiApiKey) {
+    return streamGemini(
+      config.geminiApiKey,
       options.systemPrompt,
       options.messages,
       maxTokens,
@@ -130,6 +141,39 @@ async function streamOpenAI(
   return { provider: "openai" };
 }
 
+async function streamGemini(
+  apiKey: string,
+  systemPrompt: string,
+  messages: ChatMessage[],
+  maxTokens: number,
+  onChunk: StreamChunkCallback
+): Promise<{ provider: "gemini" }> {
+  const { GoogleGenerativeAI } = await import("@google/generative-ai");
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: INTERVENTION_MODEL_GEMINI,
+    systemInstruction: systemPrompt,
+  });
+
+  const history = messages
+    .filter((m) => m.role !== "system")
+    .slice(0, -1)
+    .map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
+
+  const lastMessage = messages.filter((m) => m.role !== "system").at(-1);
+  const chat = model.startChat({ history, generationConfig: { maxOutputTokens: maxTokens } });
+  const result = await chat.sendMessageStream(lastMessage?.content ?? "");
+
+  for await (const chunk of result.stream) {
+    const text = chunk.text();
+    if (text) onChunk(text);
+  }
+  return { provider: "gemini" };
+}
+
 /**
  * Non-streaming: get full reply (uses stream under the hood and concatenates).
  * Use when you don't need streaming (e.g. server-side only).
@@ -139,7 +183,7 @@ export async function chat(options: {
   messages: ChatMessage[];
   maxTokens?: number;
   messageAttempted?: string;
-}): Promise<{ text: string; provider: "anthropic" | "openai" | "canned" }> {
+}): Promise<{ text: string; provider: "anthropic" | "openai" | "gemini" | "canned" }> {
   const parts: string[] = [];
   const { provider } = await streamChat(options, (t) => parts.push(t));
   return { text: parts.join(""), provider };

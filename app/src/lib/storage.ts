@@ -1,4 +1,4 @@
-import type { FlaggedContact, LocalSession, UserContext, PartnerContext } from "../types";
+import type { FlaggedContact, LocalSession, UserContext, PartnerContext, AIChatMessage } from "../types";
 
 const FLAGGED_KEY = "notsent_flaggedContacts";
 const SESSIONS_KEY = "notsent_sessions";
@@ -174,4 +174,27 @@ export function setPartnerContextLocal(ctx: PartnerContext | null): void {
     return;
   }
   localStorage.setItem(PARTNER_CONTEXT_KEY, JSON.stringify(ctx));
+}
+
+const AI_CHAT_PREFIX = "notsent_ai_chat_";
+
+/** Retrieve persisted AI chat history for a specific contact. */
+export function getContactAIChatHistory(contactId: string): AIChatMessage[] {
+  try {
+    const raw = localStorage.getItem(`${AI_CHAT_PREFIX}${contactId}`);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+/** Persist AI chat history for a specific contact. */
+export function setContactAIChatHistory(contactId: string, messages: AIChatMessage[]): void {
+  localStorage.setItem(`${AI_CHAT_PREFIX}${contactId}`, JSON.stringify(messages));
+}
+
+/** Clear AI chat history for a specific contact. */
+export function clearContactAIChatHistory(contactId: string): void {
+  localStorage.removeItem(`${AI_CHAT_PREFIX}${contactId}`);
 }

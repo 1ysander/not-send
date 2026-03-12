@@ -9,6 +9,7 @@ import { statsRoutes } from "./routes/stats.js";
 import { chatRoutes } from "./routes/chat.js";
 import { contextRoutes } from "./routes/context.js";
 import { engineRoutes } from "./routes/engine.js";
+import { parseRoutes } from "./routes/parse.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -78,6 +79,7 @@ app.use("/api", statsRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/context", contextRoutes);
 app.use("/api/engine", engineRoutes);
+app.use("/api/parse-imessage", parseRoutes);
 
 server.listen(PORT, () => {
   console.log(`NOTSENT backend running at http://localhost:${PORT}`);

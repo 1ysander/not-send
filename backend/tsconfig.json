@@ -9,5 +9,6 @@
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*", "connectors/**/*", "engine/**/*", "server.ts"]
+  "include": ["src/**/*"],
+  "exclude": ["engine", "connectors", "node_modules", "dist"]
 }

@@ -5,13 +5,17 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthProvider } from "./context/AuthContext";
 import { supabaseEnabled } from "./lib/supabase";
 import App from "./App";
+import { RootLayout } from "./layout";
+import "./index.css";
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
 
 const app = (
   <AuthProvider>
     <BrowserRouter>
-      <App />
+      <RootLayout>
+        <App />
+      </RootLayout>
     </BrowserRouter>
   </AuthProvider>
 );

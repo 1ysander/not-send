@@ -1,10 +1,10 @@
 import { Router } from "express";
 import {
-  setUserContextByDevice,
-  getUserContextByDevice,
-  setPartnerContextByDevice,
-  getPartnerContextByDevice,
-} from "../../engine/conversationEngine.js";
+  setUserContext,
+  getUserContext,
+  setPartnerContext,
+  getPartnerContext,
+} from "../store.js";
 import type { UserContext, PartnerContext } from "../types.js";
 
 export const contextRoutes = Router();
@@ -19,7 +19,7 @@ contextRoutes.put("/user", (req, res) => {
     breakupSummary: userContext.breakupSummary,
     partnerName: userContext.partnerName,
   };
-  setUserContextByDevice(deviceId, uc);
+  setUserContext(deviceId, uc);
   res.json({ ok: true });
 });
 
@@ -29,7 +29,7 @@ contextRoutes.get("/user", (req, res) => {
     res.status(400).json({ error: "deviceId query required" });
     return;
   }
-  const ctx = getUserContextByDevice(deviceId);
+  const ctx = getUserContext(deviceId);
   res.json(ctx ?? {});
 });
 
@@ -44,8 +44,9 @@ contextRoutes.put("/partner", (req, res) => {
     sampleMessages: Array.isArray(partnerContext.sampleMessages)
       ? partnerContext.sampleMessages
       : undefined,
+    relationshipMemory: partnerContext.relationshipMemory,
   };
-  setPartnerContextByDevice(deviceId, pc);
+  setPartnerContext(deviceId, pc);
   res.json({ ok: true });
 });
 
@@ -55,6 +56,6 @@ contextRoutes.get("/partner", (req, res) => {
     res.status(400).json({ error: "deviceId query required" });
     return;
   }
-  const ctx = getPartnerContextByDevice(deviceId);
+  const ctx = getPartnerContext(deviceId);
   res.json(ctx ?? {});
 });

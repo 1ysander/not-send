@@ -4,7 +4,7 @@ import {
   updateOutcome,
   getSessionById,
   setUserContextByDevice,
-} from "../../engine/conversationEngine.js";
+} from "../engine/conversationEngine.js";
 import type { UserContext } from "../types.js";
 
 export const sessionRoutes = Router();

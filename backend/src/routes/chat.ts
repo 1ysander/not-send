@@ -4,7 +4,7 @@ import {
   streamClosure,
   streamSupport,
   getHistory,
-} from "../../engine/conversationEngine.js";
+} from "../engine/conversationEngine.js";
 import { getIO } from "../socket.js";
 
 export const chatRoutes = Router();
@@ -68,7 +68,7 @@ chatRoutes.post("/closure", async (req, res) => {
 
   let partnerContext = bodyPartnerContext;
   if (!partnerContext?.partnerName && typeof deviceId === "string") {
-    const { getPartnerContextByDevice } = await import("../../engine/conversationEngine.js");
+    const { getPartnerContextByDevice } = await import("../engine/conversationEngine.js");
     partnerContext = getPartnerContextByDevice(deviceId);
   }
   if (!partnerContext?.partnerName) {

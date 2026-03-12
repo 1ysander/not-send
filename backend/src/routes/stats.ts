@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getStats } from "../../engine/conversationEngine.js";
+import { getStats } from "../engine/conversationEngine.js";
 
 export const statsRoutes = Router();
 

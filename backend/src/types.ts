@@ -37,6 +37,37 @@ export interface UserContext {
   conversationContext?: ConversationContextType;
 }
 
+/**
+ * Extracted writing style and communication patterns from the uploaded conversation.
+ * Built by memoryBuilder.ts from parsed messages — no LLM required.
+ */
+export interface RelationshipMemory {
+  /** Partner's average message length in characters */
+  avgMessageLength: number;
+  /** Does the partner typically skip sentence-starting capitals? */
+  usesLowercase: boolean;
+  /** How often the partner uses emojis */
+  emojiUsage: "heavy" | "moderate" | "rare" | "none";
+  /** Top emojis the partner used */
+  topEmojis: string[];
+  /** Nicknames / endearments the partner used for the user */
+  endearments: string[];
+  /** Frequent phrases or sentence openers the partner used */
+  commonPhrases: string[];
+  /** Does the partner use ellipsis (...) a lot? */
+  usesEllipsis: boolean;
+  /** Does the partner use repeated punctuation (!! ??) */
+  usesRepeatedPunctuation: boolean;
+  /** Recurring topics detected in the conversation */
+  recurringTopics: string[];
+  /** Partner's dominant emotional tone */
+  partnerTone: "warm" | "playful" | "distant" | "casual" | "anxious";
+  /** Number of messages from the partner in the upload */
+  partnerMessageCount: number;
+  /** Number of messages from the user in the upload */
+  userMessageCount: number;
+}
+
 /** Optional context about the ex for closure flow: simulate their voice without reaching out. */
 export interface PartnerContext {
   partnerName: string;
@@ -46,6 +77,11 @@ export interface PartnerContext {
    * Token-heavy; apply limits in production.
    */
   sampleMessages?: Array<{ fromPartner: boolean; text: string }>;
+  /**
+   * Structured writing-style analysis extracted from the uploaded conversation.
+   * Used to generate language-specific, style-accurate AI responses.
+   */
+  relationshipMemory?: RelationshipMemory;
 }
 
 /** Request body for intervention chat: can include history and context for richer prompts. */

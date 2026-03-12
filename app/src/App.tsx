@@ -7,7 +7,7 @@ import { AppShell } from "./components/AppShell";
 import { AddContactScreen } from "./screens/Onboarding/AddContactScreen";
 import { YoureSetScreen } from "./screens/Onboarding/YoureSetScreen";
 import { LoginScreen } from "./screens/Login/LoginScreen";
-import { ConversationList } from "./screens/Chat/ConversationList";
+import Page from "./page";
 import { ChatScreen } from "./screens/Chat/ChatScreen";
 import { InterventionChat } from "./screens/Intervention/InterventionChat";
 import { ManageConversationsScreen } from "./screens/Conversations/ManageConversationsScreen";
@@ -15,6 +15,7 @@ import { StatsScreen } from "./screens/Stats/StatsScreen";
 import { SettingsScreen } from "./screens/Settings/SettingsScreen";
 import { ContactsScreen } from "./screens/Contacts/ContactsScreen";
 import { AIChatScreen } from "./screens/AIChat/AIChatScreen";
+import { ContactAIChatScreen } from "./screens/AIChat/ContactAIChatScreen";
 
 /** Guards the main app: requires auth (when Supabase enabled) + onboarding. */
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -56,7 +57,7 @@ export default function App() {
       <Route path="/onboarding" element={<PublicOnboardingOnly><AddContactScreen /></PublicOnboardingOnly>} />
       <Route path="/onboarding/set" element={<PublicOnboardingOnly><YoureSetScreen /></PublicOnboardingOnly>} />
       <Route path="/" element={<AuthGuard><ConversationSocketProvider><AppShell /></ConversationSocketProvider></AuthGuard>}>
-        <Route index element={<ConversationList />} />
+        <Route index element={<Page />} />
         <Route path="ai-chat" element={<AIChatScreen />} />
         <Route path="conversations" element={<ManageConversationsScreen />} />
         <Route path="contacts" element={<ContactsScreen />} />

@@ -45,10 +45,33 @@ export interface UserContext {
   conversationContext?: ConversationContextType;
 }
 
+/** Writing style + communication patterns extracted from uploaded conversation. */
+export interface RelationshipMemory {
+  avgMessageLength: number;
+  usesLowercase: boolean;
+  emojiUsage: "heavy" | "moderate" | "rare" | "none";
+  topEmojis: string[];
+  endearments: string[];
+  commonPhrases: string[];
+  usesEllipsis: boolean;
+  usesRepeatedPunctuation: boolean;
+  recurringTopics: string[];
+  partnerTone: "warm" | "playful" | "distant" | "casual" | "anxious";
+  partnerMessageCount: number;
+  userMessageCount: number;
+}
+
 /** For closure flow: simulate ex's voice. Sample messages from partner. */
 export interface PartnerContext {
   partnerName: string;
   sampleMessages?: Array<{ fromPartner: boolean; text: string }>;
+  relationshipMemory?: RelationshipMemory;
+}
+
+/** A single message in an AI chat thread. */
+export interface AIChatMessage {
+  role: "user" | "assistant";
+  content: string;
 }
 
 /** Signed-in Google account (from OAuth credential). */

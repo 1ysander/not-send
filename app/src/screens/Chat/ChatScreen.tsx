@@ -1,8 +1,10 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Trash2, Send, ChevronLeft, Shield, HeartCrack, Sparkles } from "lucide-react";
+import { Trash2, ChevronLeft, Shield, HeartCrack, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ChatWindow } from "@/components/chat/ChatWindow";
+import { InputBar } from "@/components/chat/InputBar";
 import {
   getFlaggedContacts,
   getDeviceId,
@@ -60,8 +62,8 @@ export function ChatScreen() {
     threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [intervention?.reply, intervention?.loading, sessions]);
 
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSend(e?: React.FormEvent) {
+    e?.preventDefault();
     const text = input.trim();
     if (!text || sending || !contactId || !contact) return;
     setError("");
@@ -202,7 +204,7 @@ export function ChatScreen() {
     <div className="flex h-full min-h-0 flex-col bg-background">
 
       {/* ── Header ── */}
-      <header className="glass sticky top-0 z-10 flex flex-shrink-0 items-center h-14 gap-2 border-b px-3">
+      <header className="sticky top-0 z-10 flex flex-shrink-0 items-center h-14 gap-2 border-b border-border px-3 bg-background">
         <Button
           variant="ghost"
           size="icon-sm"
@@ -263,10 +265,8 @@ export function ChatScreen() {
         </div>
       )}
 
-      {/* ── Thread ── */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-4 py-5 space-y-2.5 max-w-xl mx-auto">
-
+      <ChatWindow>
+        <div className="space-y-6">
           {threadMessages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-up">
               <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-secondary mb-4 shadow-sm">
@@ -291,24 +291,24 @@ export function ChatScreen() {
             <div
               key={m.id}
               className={cn(
-                "flex animate-fade-in",
-                m.outcome === "sent" ? "justify-end" : "justify-start"
+                "flex max-w-xl",
+                m.outcome === "sent" ? "ml-auto justify-end" : "justify-start"
               )}
             >
               <div
                 className={cn(
-                  "max-w-[78%] rounded-[18px] px-3.5 py-2.5",
+                  "rounded-xl px-4 py-3 text-[15px] leading-relaxed",
                   m.outcome === "sent"
-                    ? "bg-foreground text-background rounded-br-[4px]"
-                    : "bg-secondary text-foreground rounded-bl-[4px]"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-foreground"
                 )}
               >
-                <p className="text-[15px] leading-relaxed">{m.text}</p>
+                <p className="leading-relaxed">{m.text}</p>
                 <div className="mt-1 flex items-center gap-1.5">
                   {m.outcome !== "sent" && (
-                    <span className="text-[11px] opacity-50 italic">Not sent</span>
+                    <span className="text-[11px] opacity-70 italic">Not sent</span>
                   )}
-                  <span className="text-[11px] opacity-45">
+                  <span className="text-[11px] opacity-70">
                     {new Date(m.timestamp).toLocaleTimeString([], {
                       hour: "numeric",
                       minute: "2-digit",
@@ -319,16 +319,13 @@ export function ChatScreen() {
             </div>
           ))}
 
-          {/* ── Intervention card ── */}
           {intervention && (
-            <div className="rounded-2xl border border-border bg-card overflow-hidden mt-3 shadow-md animate-scale-in">
-              {/* Gradient accent bar */}
-              <div className="h-1 bg-brand-gradient" />
-
-              <div className="px-4 pt-3 pb-2 border-b border-border/60">
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="h-0.5 bg-primary" />
+              <div className="px-4 pt-3 pb-2 border-b border-border">
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-[#bf5af2]" />
-                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     NOTSENT
                   </p>
                 </div>
@@ -337,7 +334,6 @@ export function ChatScreen() {
                   "{intervention.messageAttempted}"
                 </p>
               </div>
-
               <div className="px-4 py-3 min-h-[4rem]">
                 {intervention.loading && !intervention.reply && !liveReply ? (
                   <div className="flex items-center gap-1.5">
@@ -355,14 +351,12 @@ export function ChatScreen() {
                 )}
                 <div ref={threadEndRef} />
               </div>
-
               {!intervention.loading && (
-                <div className="flex gap-2.5 px-4 pb-4 pt-1">
+                <div className="flex gap-3 px-4 pb-4 pt-1">
                   <Button
                     onClick={() => handleOutcome("intercepted")}
                     disabled={intervention.actionLoading}
-                    size="default"
-                    className="flex-1"
+                    className="flex-1 rounded-lg bg-primary text-primary-foreground"
                   >
                     Won't send it
                   </Button>
@@ -370,8 +364,7 @@ export function ChatScreen() {
                     variant="outline"
                     onClick={() => handleOutcome("sent")}
                     disabled={intervention.actionLoading}
-                    size="default"
-                    className="flex-1"
+                    className="flex-1 rounded-lg"
                   >
                     Send anyway
                   </Button>
@@ -381,44 +374,18 @@ export function ChatScreen() {
           )}
         </div>
         {!intervention && <div ref={threadEndRef} />}
-      </div>
+      </ChatWindow>
 
-      {/* ── Compose bar ── */}
-      <form
+      {error && (
+        <p className="px-4 py-1 text-[12px] text-destructive bg-background">{error}</p>
+      )}
+      <InputBar
+        value={input}
+        onChange={setInput}
         onSubmit={handleSend}
-        className="glass flex flex-shrink-0 items-center gap-2 border-t px-3.5 py-2.5 pb-safe"
-      >
-        {error && (
-          <p className="absolute bottom-full mb-1 text-[12px] text-destructive px-4">{error}</p>
-        )}
-        <input
-          type="text"
-          placeholder={`Message ${contact.name}…`}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          disabled={sending}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSend(e as unknown as React.FormEvent);
-            }
-          }}
-          className="flex-1 h-10 rounded-full bg-secondary px-4 text-[15px] text-foreground placeholder:text-muted-foreground border-0 outline-none focus:ring-2 focus:ring-[#bf5af2]/30 transition-shadow disabled:opacity-50"
-        />
-        <button
-          type="submit"
-          disabled={sending || !input.trim()}
-          aria-label="Send"
-          className={cn(
-            "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition-all duration-150 active:scale-90",
-            input.trim() && !sending
-              ? "bg-foreground text-background shadow-sm"
-              : "bg-secondary text-muted-foreground"
-          )}
-        >
-          <Send className="h-4 w-4" />
-        </button>
-      </form>
+        placeholder={`Message ${contact.name}…`}
+        disabled={sending}
+      />
     </div>
   );
 }

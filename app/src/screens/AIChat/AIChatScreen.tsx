@@ -1,8 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { getDeviceId, getUserContext } from "@/lib/storage";
 import { streamSupportChat } from "@/api";
-import { Send, Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Sparkles, SquarePen } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ChatWindow } from "@/components/chat/ChatWindow";
+import { MessageBubble } from "@/components/chat/MessageBubble";
+import { InputBar } from "@/components/chat/InputBar";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -18,10 +21,11 @@ const STARTERS = [
 
 export function AIChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput]       = useState("");
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(null);
-  const endRef                  = useRef<HTMLDivElement>(null);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showNewConfirm, setShowNewConfirm] = useState(false);
+  const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -35,7 +39,7 @@ export function AIChatScreen() {
     setMessages((prev) => [...prev, userMessage]);
     setLoading(true);
 
-    const deviceId    = getDeviceId();
+    const deviceId = getDeviceId();
     const userContext = getUserContext();
     const conversation: ChatMessage[] = [...messages, userMessage];
 
@@ -67,51 +71,66 @@ export function AIChatScreen() {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    await send(input.trim());
-  }
-
   const isEmpty = messages.length === 0;
 
   return (
     <div className="flex flex-col h-full bg-background">
-
-      {/* ── Header ── */}
-      <header className="glass sticky top-0 z-10 flex items-center h-14 border-b px-4 flex-shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-gradient shadow-sm">
-            <Sparkles className="h-4 w-4 text-white" />
+      <header className="flex-shrink-0 flex items-center h-14 border-b border-border px-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <Sparkles className="h-4 w-4" />
           </div>
           <div>
             <p className="text-[15px] font-semibold text-foreground leading-none">AI Support</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Private & confidential</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">Private & confidential</p>
           </div>
         </div>
+        {messages.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowNewConfirm(true)}
+            className="ml-auto flex h-8 w-8 items-center justify-center rounded-full hover:bg-secondary transition-colors text-muted-foreground"
+            aria-label="New conversation"
+          >
+            <SquarePen className="h-4 w-4" />
+          </button>
+        )}
       </header>
 
-      {/* ── Messages ── */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        {isEmpty ? (
-          <div className="flex flex-col items-center justify-center h-full py-16 text-center animate-fade-up">
-            <div className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-brand-gradient shadow-lg mb-5">
-              <Sparkles className="h-7 w-7 text-white" />
+      {showNewConfirm && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-card border border-border p-5 shadow-xl animate-scale-in">
+            <p className="text-[15px] font-semibold text-foreground mb-1">Start a new conversation?</p>
+            <p className="text-[14px] text-muted-foreground">This will clear the current chat.</p>
+            <div className="mt-5 flex gap-2.5">
+              <Button variant="secondary" className="flex-1" onClick={() => setShowNewConfirm(false)}>
+                Cancel
+              </Button>
+              <Button className="flex-1" onClick={() => { setMessages([]); setError(null); setShowNewConfirm(false); }}>
+                New chat
+              </Button>
             </div>
-            <p className="text-[20px] font-bold text-foreground mb-1.5">
-              How are you feeling?
-            </p>
-            <p className="text-[14px] text-muted-foreground max-w-[240px] leading-relaxed mb-8">
+          </div>
+        </div>
+      )}
+
+      <ChatWindow>
+        {isEmpty ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-secondary mb-6">
+              <Sparkles className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <p className="text-xl font-semibold text-foreground mb-1.5">How are you feeling?</p>
+            <p className="text-[14px] text-muted-foreground max-w-[260px] leading-relaxed mb-8">
               This is a safe space. Talk openly — nothing leaves your device.
             </p>
-
-            {/* Quick starters */}
-            <div className="flex flex-col gap-2 w-full max-w-xs">
+            <div className="flex flex-col gap-2 w-full max-w-sm">
               {STARTERS.map((s) => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => send(s)}
-                  className="rounded-xl border border-border bg-card px-4 py-3 text-[14px] text-left text-foreground hover:bg-secondary transition-colors active:scale-[0.98]"
+                  className="rounded-xl border border-border bg-background px-4 py-3 text-[14px] text-left text-foreground hover:bg-secondary transition-colors"
                 >
                   {s}
                 </button>
@@ -119,81 +138,30 @@ export function AIChatScreen() {
             </div>
           </div>
         ) : (
-          <div className="space-y-2.5 max-w-xl mx-auto">
+          <>
             {messages.map((m, i) => (
-              <div
+              <MessageBubble
                 key={i}
-                className={cn(
-                  "flex animate-fade-in",
-                  m.role === "user" ? "justify-end" : "justify-start"
-                )}
-              >
-                {m.role === "assistant" && (
-                  <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-brand-gradient mr-2 mt-1 self-end shadow-sm">
-                    <Sparkles className="h-3.5 w-3.5 text-white" />
-                  </div>
-                )}
-                <div
-                  className={cn(
-                    "max-w-[80%] rounded-[18px] px-3.5 py-2.5 text-[15px] leading-relaxed",
-                    m.role === "user"
-                      ? "bg-foreground text-background rounded-br-[4px]"
-                      : "bg-secondary text-foreground rounded-bl-[4px]"
-                  )}
-                >
-                  {m.role === "assistant" && !m.content && loading ? (
-                    <div className="flex items-center gap-1.5 py-1">
-                      <span className="typing-dot text-muted-foreground" />
-                      <span className="typing-dot text-muted-foreground" />
-                      <span className="typing-dot text-muted-foreground" />
-                    </div>
-                  ) : (
-                    <span className="whitespace-pre-wrap">{m.content}</span>
-                  )}
-                </div>
-              </div>
+                role={m.role}
+                content={m.content}
+                loading={m.role === "assistant" && !m.content && loading}
+              />
             ))}
-          </div>
+          </>
         )}
         {error && (
-          <p className="mt-2 text-[12px] text-destructive text-center">{error}</p>
+          <p className="text-[13px] text-destructive text-center">{error}</p>
         )}
         <div ref={endRef} />
-      </div>
+      </ChatWindow>
 
-      {/* ── Input ── */}
-      <form
-        onSubmit={handleSubmit}
-        className="glass flex-shrink-0 flex items-center gap-2 border-t px-3.5 py-2.5 pb-safe"
-      >
-        <input
-          type="text"
-          placeholder="Message"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          disabled={loading}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSubmit(e as unknown as React.FormEvent);
-            }
-          }}
-          className="flex-1 h-10 rounded-full bg-secondary px-4 text-[15px] text-foreground placeholder:text-muted-foreground border-0 outline-none focus:ring-2 focus:ring-[#bf5af2]/30 transition-shadow disabled:opacity-50"
-        />
-        <button
-          type="submit"
-          disabled={loading || !input.trim()}
-          aria-label="Send"
-          className={cn(
-            "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition-all duration-150 active:scale-90",
-            input.trim() && !loading
-              ? "bg-brand-gradient text-white shadow-sm"
-              : "bg-secondary text-muted-foreground"
-          )}
-        >
-          <Send className="h-4 w-4" />
-        </button>
-      </form>
+      <InputBar
+        value={input}
+        onChange={setInput}
+        onSubmit={() => send(input.trim())}
+        placeholder="Message"
+        disabled={loading}
+      />
     </div>
   );
 }

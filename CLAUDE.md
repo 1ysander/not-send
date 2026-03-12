@@ -58,15 +58,22 @@ Before writing any code:
 | Task domain | Load this file |
 |---|---|
 | Any frontend / React / UI / screens / routing | `docs/agents/FRONTEND.md` |
+| Chat UI — bubbles, streaming, interception overlay | `docs/agents/FRONTEND.md` + `docs/agents/sub/FRONTEND_CHAT.md` |
+| Upload flow, settings, stats, layout | `docs/agents/FRONTEND.md` + `docs/agents/sub/FRONTEND_SETTINGS.md` |
 | Any backend / API / routes / AI prompts / engine | `docs/agents/BACKEND.md` |
+| AI prompts / model client / streaming / risk analysis | `docs/agents/BACKEND.md` + `docs/agents/sub/AI_ENGINE.md` |
+| iMessage parsing / file upload / data ingestion | `docs/agents/BACKEND.md` + `docs/agents/sub/DATA_INGESTION.md` |
+| Interception pipeline / middleware chain | `docs/agents/BACKEND.md` + `docs/agents/sub/INTERCEPTION_PIPELINE.md` |
 | Database / auth / persistence / Supabase migration | `docs/agents/SUPABASE.md` |
+| Supabase schema design / RLS / migration files | `docs/agents/SUPABASE.md` + `docs/agents/sub/DATABASE_SCHEMA.md` |
 | E2E tests / Playwright / test coverage | `docs/agents/PLAYWRIGHT.md` |
 | Code cleanup / dead code / refactor / consolidation | `docs/agents/REFACTOR.md` |
 | Roadmap / task tracking / Notion sync | `docs/agents/NOTION.md` |
 | Agent made a mistake / user corrected direction | `docs/agents/CRORR.md` |
 | Product idea or core mechanic is changing | `docs/agents/PRODUCT_PIVOT.md` |
+| Multi-agent coordination / parallel execution | `docs/agents/ORCHESTRATION.md` |
 
-For cross-cutting tasks (e.g. adding a new feature end-to-end), load both `FRONTEND.md` and `BACKEND.md`.
+For cross-cutting tasks (e.g. adding a new feature end-to-end), load both `FRONTEND.md` and `BACKEND.md` plus the relevant sub-agent files. See `docs/agents/ORCHESTRATION.md` for the full agent hierarchy and parallel execution patterns.
 
 ---
 
@@ -234,3 +241,4 @@ SUPABASE_SERVICE_KEY=<key> # when migrated
 - Types: PascalCase interfaces, no `I` prefix
 - localStorage keys: `notsent_*` prefix (defined as constants in `storage.ts`)
 - Supabase table names: snake_case plural (`sessions`, `user_contexts`, `conversation_turns`)
+
