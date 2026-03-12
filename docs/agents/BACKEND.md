@@ -53,6 +53,7 @@ No business logic ever goes in `index.ts`.
 |---|---|---|---|
 | GET | `/health` | `index.ts` | Returns `{ status: "OK", api: "notsent" }` |
 | GET | `/api/health` | `index.ts` | Same |
+| POST | `/api/parse-imessage` | `routes/parse.ts` | **Upload entry point.** Accepts multipart .txt file, returns parsed conversation |
 | POST | `/api/session` | `routes/session.ts` | Creates session in store, returns `{ sessionId }` |
 | PATCH | `/api/session/:id` | `routes/session.ts` | Updates outcome: intercepted / sent |
 | GET | `/api/stats` | `routes/stats.ts` | Returns `{ interceptionsCount, messagesNeverSentCount }` |
@@ -417,25 +418,75 @@ console.log(JSON.stringify({
 
 ---
 
+## iMessage parser (P0 — the entry point)
+
+File: `src/engine/imessageParser.ts`
+
+iMessage exports `.txt` files in this format:
+```
+[date, time] Contact Name: message text
+[date, time] Me: message text
+```
+
+The parser must:
+1. Detect the contact name (the non-"Me" participant)
+2. Split all messages into `{ fromPartner: boolean, text: string, timestamp: string }[]`
+3. Return `{ partnerName, messageCount, sampleMessages, conversationHistory }`
+4. `sampleMessages` — up to 50 messages from the partner (feeds closure prompt)
+5. `conversationHistory` — all turns formatted as `{ role: "user" | "assistant", content }` for intervention context
+
+```ts
+// src/engine/imessageParser.ts
+export interface ParsedConversation {
+  partnerName: string;
+  messageCount: number;
+  sampleMessages: Array<{ fromPartner: boolean; text: string }>;
+  conversationHistory: Array<{ role: "user" | "assistant"; content: string }>;
+}
+
+export function parseIMExport(fileContent: string): ParsedConversation { ... }
+```
+
+Route: `src/routes/parse.ts`
+- Accept `multipart/form-data` with field `file`
+- Use `multer` (in-memory storage, 5MB limit, `.txt` only)
+- Call `parseIMExport(buffer.toString("utf-8"))`
+- Return parsed result as JSON (no SSE — this is synchronous)
+- Return 400 if file missing or parse fails
+
+---
+
+## Future: Business compliance mode (do not build yet)
+
+When building the enterprise product:
+- Add `POST /api/chat/compliance` route
+- Add `src/prompts/compliance.ts` → `buildComplianceSystemPrompt()`
+- Add `streamCompliance()` to `src/engine/conversationEngine.ts`
+- **Never reuse or modify personal app prompts for compliance**
+- The compliance prompt detects: legal liability, harassment, GDPR data, defamatory language, tone issues
+- Response format is structured JSON flags, not a conversational stream
+
+---
+
 ## What to build next (in order)
 
-### 1. Sync `UserContext` types with frontend (P0)
+### 1. iMessage parser (P0)
+- `src/engine/imessageParser.ts` — `parseIMExport(content: string): ParsedConversation`
+- `src/routes/parse.ts` — `POST /api/parse-imessage` (multipart)
+- Add `multer` to dependencies: `npm install multer @types/multer`
+- Mount in `src/index.ts`: `app.use("/api", parseRoutes)`
+
+### 2. Sync `UserContext` types with frontend (P0)
 - Add `noContactDays?: number` and `conversationContext?: string` to `src/types.ts`
 - Update `buildInterventionSystemPrompt` to use both fields
 
-### 2. Token usage logging (P1)
+### 3. Token usage logging (P1)
 - Add structured log line after every `runStreamingPrompt` call
 - Later: persist to `token_usage` Supabase table
 
-### 3. Risk analysis hook (P2)
+### 4. Risk analysis hook (P2)
 - In `streamIntervention`, before streaming, call `analyzeRisk(messageAttempted)`
-- `analyzeRisk` scores urgency (0–1) and returns `{ urgency, sentiment }`
-- Pass score to prompt builder so high-urgency messages get a gentler, slower opening
-
-### 4. Contact-level partner context (P2)
-- Add `partnerContextByContact: Map<string, PartnerContext>` to store
-- Add `setPartnerContextForContact(contactId, context)` and `getPartnerContextForContact(contactId)`
-- New routes: `PUT /api/context/partner/:contactId`, `GET /api/context/partner/:contactId`
+- Pass score to prompt builder so high-urgency messages get a gentler opening
 
 ### 5. Supabase migration (P1)
 - See `SUPABASE.md` for full plan

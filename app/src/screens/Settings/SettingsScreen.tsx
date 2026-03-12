@@ -20,12 +20,12 @@ import type { UserContext } from "@/types";
 import { PageLayout } from "@/components/PageLayout";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, Check, ChevronRight, Activity } from "lucide-react";
+import { LogOut, Check, ChevronRight, Wifi } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground px-1 mb-1.5">
+    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground px-1 mb-1.5">
       {children}
     </p>
   );
@@ -33,7 +33,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function SettingsGroup({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border">
+    <div className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border/60 shadow-sm">
       {children}
     </div>
   );
@@ -59,16 +59,16 @@ function SettingsRow({
       onClick={onClick}
       className={cn(
         "flex w-full items-center gap-3 px-4 py-3.5 text-left",
-        onClick && "hover:bg-secondary/50 active:bg-secondary transition-colors",
+        onClick && "hover:bg-secondary/40 active:bg-secondary transition-colors",
         destructive && "text-destructive"
       )}
     >
       <div className="flex-1 min-w-0">
-        <p className={cn("text-sm font-medium", destructive ? "text-destructive" : "text-foreground")}>
+        <p className={cn("text-[15px] font-medium", destructive ? "text-destructive" : "text-foreground")}>
           {label}
         </p>
         {description && (
-          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+          <p className="text-[13px] text-muted-foreground mt-0.5">{description}</p>
         )}
       </div>
       {right ?? (onClick && !destructive && <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />)}
@@ -77,13 +77,13 @@ function SettingsRow({
 }
 
 export function SettingsScreen() {
-  const [contacts] = useState(getFlaggedContacts());
+  const [contacts]          = useState(getFlaggedContacts());
   const [breakupSummary, setBreakupSummary] = useState("");
-  const [noContactDays, setNoContactDays] = useState<number | "">("");
-  const [saved, setSaved] = useState(false);
-  const navigate = useNavigate();
-  const { user, signOut } = useAuth();
-  const partnerName = contacts[0]?.name ?? "";
+  const [noContactDays, setNoContactDays]   = useState<number | "">("");
+  const [saved, setSaved]   = useState(false);
+  const navigate            = useNavigate();
+  const { user, signOut }   = useAuth();
+  const partnerName         = contacts[0]?.name ?? "";
 
   useEffect(() => {
     const ctx = getUserContext();
@@ -105,8 +105,8 @@ export function SettingsScreen() {
     setTimeout(() => setSaved(false), 2000);
   }
 
-  const [backendStatus, setBackendStatus] = useState<BackendHealth | null>(null);
-  const [partnerSynced, setPartnerSynced] = useState(false);
+  const [backendStatus, setBackendStatus]   = useState<BackendHealth | null>(null);
+  const [partnerSynced, setPartnerSynced]   = useState(false);
 
   async function handleCheckBackend() {
     setBackendStatus(null);
@@ -138,29 +138,30 @@ export function SettingsScreen() {
 
   return (
     <PageLayout title="Settings">
-      {/* Account */}
+
+      {/* ── Account ── */}
       <div>
         <SectionLabel>Account</SectionLabel>
         <SettingsGroup>
           {user ? (
             <>
-              <div className="flex items-center gap-3 px-4 py-3.5">
+              <div className="flex items-center gap-3 px-4 py-4">
                 {user.picture ? (
                   <img
                     src={user.picture}
                     alt=""
-                    className="h-9 w-9 rounded-full object-cover flex-shrink-0"
+                    className="h-10 w-10 rounded-full object-cover flex-shrink-0 ring-2 ring-border"
                   />
                 ) : (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary flex-shrink-0">
-                    <span className="text-sm font-semibold text-foreground">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-gradient flex-shrink-0">
+                    <span className="text-[15px] font-semibold text-white">
                       {(user.name ?? "?")[0].toUpperCase()}
                     </span>
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  <p className="text-[15px] font-semibold text-foreground truncate">{user.name}</p>
+                  <p className="text-[13px] text-muted-foreground truncate">{user.email}</p>
                 </div>
               </div>
               <SettingsRow
@@ -178,23 +179,23 @@ export function SettingsScreen() {
         </SettingsGroup>
       </div>
 
-      {/* AI Context */}
+      {/* ── AI Context ── */}
       <div>
         <SectionLabel>AI Context</SectionLabel>
-        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Helps AI reference your situation during interventions.
+        <div className="rounded-2xl border border-border bg-card p-4 space-y-3 shadow-sm">
+          <p className="text-[13px] text-muted-foreground">
+            Helps the AI reference your situation during interventions.
           </p>
           <textarea
             placeholder="e.g. We broke up 2 months ago after a 3-year relationship…"
             value={breakupSummary}
             onChange={(e) => setBreakupSummary(e.target.value)}
             rows={3}
-            className="w-full rounded-lg bg-secondary border-0 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring/30 resize-none transition-shadow"
+            className="w-full rounded-xl bg-secondary border-0 px-3.5 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/60 outline-none focus:ring-2 focus:ring-[#bf5af2]/30 resize-none transition-shadow"
           />
           <div className="flex items-center gap-3">
             <div className="flex-1">
-              <label className="text-xs font-medium text-muted-foreground block mb-1">
+              <label className="text-[12px] font-semibold text-muted-foreground block mb-1.5">
                 No contact (days)
               </label>
               <input
@@ -205,7 +206,7 @@ export function SettingsScreen() {
                 onChange={(e) =>
                   setNoContactDays(e.target.value === "" ? "" : parseInt(e.target.value, 10))
                 }
-                className="w-20 h-9 rounded-lg bg-secondary border-0 px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring/30 transition-shadow"
+                className="w-20 h-10 rounded-xl bg-secondary border-0 px-3 text-[15px] text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-[#bf5af2]/30 transition-shadow"
               />
             </div>
             <Button
@@ -227,7 +228,7 @@ export function SettingsScreen() {
         </div>
       </div>
 
-      {/* Contacts */}
+      {/* ── Contacts ── */}
       <div>
         <SectionLabel>Contacts</SectionLabel>
         <SettingsGroup>
@@ -239,7 +240,7 @@ export function SettingsScreen() {
         </SettingsGroup>
       </div>
 
-      {/* Backend */}
+      {/* ── Connection ── */}
       <div>
         <SectionLabel>Connection</SectionLabel>
         <SettingsGroup>
@@ -247,29 +248,35 @@ export function SettingsScreen() {
             label="Check backend"
             right={
               backendStatus ? (
-                <span className={cn("text-xs font-medium", backendStatus.ok ? "text-brand" : "text-destructive")}>
-                  {backendStatus.ok ? "Connected" : "Offline"}
+                <span className={cn(
+                  "text-[13px] font-semibold",
+                  backendStatus.ok ? "text-[#30d158]" : "text-destructive"
+                )}>
+                  {backendStatus.ok ? "Online" : "Offline"}
                 </span>
               ) : (
-                <Activity className="h-4 w-4 text-muted-foreground" />
+                <Wifi className="h-4 w-4 text-muted-foreground" />
               )
             }
             onClick={handleCheckBackend}
           />
           <SettingsRow
             label="Load partner from backend"
-            right={<ChevronRight className="h-4 w-4 text-muted-foreground" />}
             onClick={handleLoadPartnerFromBackend}
           />
           <SettingsRow
             label={partnerSynced ? "Synced" : "Save partner to backend"}
-            right={partnerSynced ? <Check className="h-4 w-4 text-brand" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+            right={
+              partnerSynced
+                ? <Check className="h-4 w-4 text-[#30d158]" />
+                : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            }
             onClick={handleSyncPartnerToBackend}
           />
         </SettingsGroup>
       </div>
 
-      {/* Danger zone */}
+      {/* ── Danger zone ── */}
       <div>
         <SectionLabel>Danger zone</SectionLabel>
         <SettingsGroup>

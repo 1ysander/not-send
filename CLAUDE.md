@@ -1,12 +1,25 @@
 # NOTSENT — Master Agent Instructions
 
-## What this app is
+## What this is — two products, one engine
 
-NOTSENT intercepts messages people are about to send their ex and replaces the send with an AI conversation that helps them process the impulse instead of sending. Three AI modes:
+### Product 1: NOTSENT (Personal web app)
 
-1. **Intervention** — when user hits Send, AI talks them through it in real time
-2. **Closure** — simulate texting the ex (AI plays the ex's voice using sample messages) for closure without actually reaching out
-3. **Support** — general emotional support chat, no message-interception trigger
+A website that helps people process the impulse to text their ex — without actually doing it. The entry point is **uploading an exported iMessage conversation** (.txt file from iPhone), which gives the AI full context about the relationship.
+
+Three AI modes:
+1. **Intervention** — user types a message they *want* to send; AI talks them through the impulse in real time before it goes anywhere
+2. **Closure** — AI plays the ex's voice (trained on the uploaded conversation) so the user can have the conversation they need without real contact
+3. **Support** — general emotional support chat, no specific message trigger
+
+**No real-time iMessage integration.** The iMessage bridge is a file upload, not a live hook. User exports the chat from their iPhone as a `.txt` file, uploads it to NOTSENT, and the app parses it to extract the conversation history + the ex's sample messages. That context feeds all three AI modes.
+
+**This is a website, not a phone app.** The UI must look exceptional — emotionally designed, visually polished, full-page web experience. The product *is* the website.
+
+### Product 2: Enterprise Compliance Layer (separate product, shared engine)
+
+A browser/email plugin businesses install to scan outbound messages before sending. Flags legal liability, harassment, GDPR data leakage, defamatory language, and tone issues. Uses the same Claude backend but a completely different prompt path (`business` mode) and different UI.
+
+**Status:** Not yet built. Personal app ships first. When building the compliance layer, add a `streamCompliance()` engine function and `buildComplianceSystemPrompt()` — do not reuse or modify the personal app prompts.
 
 ---
 
@@ -38,7 +51,9 @@ Breakupfix/
 
 ## Agent routing — read this first
 
-Before writing any code, load the relevant agent file from `docs/agents/`:
+Before writing any code:
+1. Read `docs/agents/CRORR.md` — documented past mistakes. Every agent, every session.
+2. Load the relevant domain agent file below.
 
 | Task domain | Load this file |
 |---|---|
@@ -48,6 +63,8 @@ Before writing any code, load the relevant agent file from `docs/agents/`:
 | E2E tests / Playwright / test coverage | `docs/agents/PLAYWRIGHT.md` |
 | Code cleanup / dead code / refactor / consolidation | `docs/agents/REFACTOR.md` |
 | Roadmap / task tracking / Notion sync | `docs/agents/NOTION.md` |
+| Agent made a mistake / user corrected direction | `docs/agents/CRORR.md` |
+| Product idea or core mechanic is changing | `docs/agents/PRODUCT_PIVOT.md` |
 
 For cross-cutting tasks (e.g. adding a new feature end-to-end), load both `FRONTEND.md` and `BACKEND.md`.
 
@@ -65,17 +82,15 @@ api.ts                           ← ALL backend calls (single source)
 lib/storage.ts                   ← ALL localStorage access (single source)
 lib/utils.ts                     ← cn() and shared helpers
 screens/
-  Onboarding/AddContactScreen    ← add ex's contact
-  Onboarding/YoureSetScreen      ← post-onboarding confirmation
-  Login/LoginScreen              ← Google OAuth login
-  Chat/ConversationList          ← list of flagged contact threads (tab: Chats)
-  Chat/ChatScreen                ← message thread for one contact
-  Intervention/InterventionChat  ← AI intervention after hitting Send
-  Conversations/ManageConversationsScreen ← view/clear conversation history (tab)
-  AIChat/AIChatScreen            ← general AI support chat (tab: AI Chat)
-  Stats/StatsScreen              ← messages stopped / never sent (tab: Stats)
-  Settings/SettingsScreen        ← breakup context, manage contacts (tab: Settings)
-  Contacts/ContactsScreen        ← add/remove contacts (linked from Settings)
+  Home/HomeScreen                ← landing page / hero with upload CTA
+  Upload/UploadScreen            ← file picker + upload + parse progress
+  Chat/ChatScreen                ← parsed conversation view + "Intercept" / "Talk to [name]" actions
+  Intervention/InterventionChat  ← AI intervention on a draft message (full-screen, no nav)
+  Closure/ClosureScreen          ← AI plays the ex's voice (full-screen, no nav)
+  AIChat/AIChatScreen            ← general support chat
+  Stats/StatsScreen              ← messages intercepted / never sent
+  Settings/SettingsScreen        ← breakup context, uploaded conversation management
+  Login/LoginScreen              ← Google OAuth (future)
 components/
   AppShell.tsx                   ← tab bar + outlet
   ui/                            ← shadcn/ui primitives only
@@ -95,10 +110,12 @@ routes/
   chat.ts                        ← POST /api/chat (intervention), /chat/closure, /chat/support
   context.ts                     ← PUT/GET /api/context/user, /context/partner
   stats.ts                       ← GET /api/stats
+  parse.ts                       ← POST /api/parse-imessage (multipart, iMessage .txt parser)
   engine.ts                      ← engine control routes
 engine/
   conversationEngine.ts          ← streamIntervention, streamClosure, streamSupport
   riskAnalysis.ts
+  imessageParser.ts              ← parseIMExport(buffer) → { partnerName, sampleMessages[], history[] }
   sendController.ts
   creditUsage.ts
 ai/
@@ -133,26 +150,49 @@ connectors/
 
 | Area | Now | Target |
 |---|---|---|
+| Entry point | Mobile-first tab nav SPA | Upload-first full-page website |
+| iMessage bridge | Simulated / manual contact add | Parse exported .txt file from iPhone |
 | Persistence | localStorage + in-memory backend | Supabase (Postgres) |
 | Auth | Device ID (no accounts) | Supabase Auth (Google OAuth + email) |
 | Realtime | Socket.io (in-process) | Supabase Realtime |
-| Deploy | Local dev only | Vercel (frontend) + Railway/Render (backend) or Edge Functions |
+| Deploy | Local dev only | Vercel (frontend) + Railway/Render (backend) |
 | Tests | None | Playwright E2E covering critical flows |
 | AI model | claude-sonnet-4-6 | claude-sonnet-4-6 (keep unless cost requires haiku) |
+| Products | 1 (personal) | 2 (personal + enterprise compliance) |
 
 ---
 
 ## Data flow (canonical)
 
+### Upload flow (entry point for personal app)
 ```
-User types → ChatScreen (localStorage write) → hits Send
+User lands on homepage
+  → clicks "Upload your conversation"
+  → selects iMessage .txt export file
+  → POST /api/parse-imessage (multipart) → backend parses .txt
+  → returns { partnerName, messageCount, sampleMessages[], conversationHistory[] }
+  → stored in localStorage via setPartnerContextLocal() + setConversationHistoryLocal()
+  → navigate to /chat — user sees parsed conversation summary
+```
+
+### Intervention flow (user has a message they want to send)
+```
+User types draft on /chat → hits "Intercept"
   → POST /api/session → sessionId stored in sessionStorage
   → navigate to /intervention
   → InterventionChat reads sessionStorage → POST /api/chat (SSE stream)
-  → backend builds system prompt (intervention.ts) with userContext + history
+  → backend builds system prompt (intervention.ts) with uploadedContext + history
   → stream to UI → user picks "I won't send it" (intercepted) or "Send anyway" (sent)
-  → PATCH /api/session/:id → updateLocalSessionOutcome() → back to ChatScreen
-  → StatsScreen reads GET /api/stats or localStorage fallback
+  → PATCH /api/session/:id → updateLocalSessionOutcome() → back to /chat
+```
+
+### Closure flow
+```
+User clicks "Talk to [name]" on /chat
+  → navigate to /closure
+  → ClosureScreen reads partnerContext from localStorage
+  → POST /api/chat/closure (SSE) with partnerContext (sample messages from upload)
+  → AI plays the ex's voice — free chat toward closure
 ```
 
 ---

@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Trash2, Send, ArrowLeft, ShieldCheck, HeartCrack } from "lucide-react";
+import { Trash2, Send, ChevronLeft, Shield, HeartCrack, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   getFlaggedContacts,
@@ -26,31 +26,31 @@ interface InterventionState {
   actionLoading: boolean;
 }
 
-const CANNED_REPLY = `Hey, are you sure you're going to do this?
+const CANNED_REPLY = `Hey — before you hit send, take a breath.
 
-Sending might not give you what you're really looking for. We're here to support you — one step at a time. What do you actually need right now that isn't them? Take a breath. You've got this.`;
+Sending might not give you what you're really looking for. What do you actually need right now that isn't them? You've got this.`;
 
 export function ChatScreen() {
   const { contactId } = useParams<{ contactId: string }>();
-  const contacts = getFlaggedContacts();
-  const contact = useMemo(
+  const contacts      = getFlaggedContacts();
+  const contact       = useMemo(
     () => (contactId ? contacts.find((c) => c.id === contactId) : null),
     [contacts, contactId]
   );
 
-  const [sessions, setSessions] = useState<LocalSession[]>(() =>
+  const [sessions, setSessions]             = useState<LocalSession[]>(() =>
     contactId ? getSessionsForContact(contactId) : []
   );
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState("");
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [intervention, setIntervention] = useState<InterventionState | null>(null);
-  const threadEndRef = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
-  const socket = useConversationSocketOptional();
-  const liveMessages = intervention ? socket?.getMessages(intervention.sessionId) : undefined;
-  const liveReply = liveMessages?.filter((m) => m.role === "assistant").pop()?.content ?? null;
+  const [input, setInput]                   = useState("");
+  const [sending, setSending]               = useState(false);
+  const [error, setError]                   = useState("");
+  const [showDeleteConfirm, setShowDelete]  = useState(false);
+  const [intervention, setIntervention]     = useState<InterventionState | null>(null);
+  const threadEndRef                        = useRef<HTMLDivElement>(null);
+  const navigate                            = useNavigate();
+  const socket                              = useConversationSocketOptional();
+  const liveMessages                        = intervention ? socket?.getMessages(intervention.sessionId) : undefined;
+  const liveReply                           = liveMessages?.filter((m) => m.role === "assistant").pop()?.content ?? null;
 
   function refreshSessions() {
     if (contactId) setSessions(getSessionsForContact(contactId));
@@ -70,9 +70,9 @@ export function ChatScreen() {
 
     let sessionId: string;
     try {
-      const deviceId = getDeviceId();
+      const deviceId   = getDeviceId();
       const userContext = getUserContext();
-      const result = await startReview(webReviewTransport, text, {
+      const result     = await startReview(webReviewTransport, text, {
         deviceId,
         userContext: userContext
           ? {
@@ -115,7 +115,7 @@ export function ChatScreen() {
       return;
     }
 
-    const deviceId = getDeviceId();
+    const deviceId    = getDeviceId();
     const userContext = getUserContext();
     streamReviewResponse(
       webReviewTransport,
@@ -173,15 +173,15 @@ export function ChatScreen() {
   function handleDeleteChat() {
     if (!contactId) return;
     deleteSessionsForContact(contactId);
-    setShowDeleteConfirm(false);
+    setShowDelete(false);
     navigate("/", { replace: true });
   }
 
   if (!contactId || !contact) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center p-6">
-        <p className="text-sm text-muted-foreground">Contact not found.</p>
-        <Button variant="ghost" className="mt-2 text-sm" onClick={() => navigate("/")}>
+        <p className="text-[14px] text-muted-foreground">Contact not found.</p>
+        <Button variant="ghost" className="mt-2" onClick={() => navigate("/")}>
           Back to Messages
         </Button>
       </div>
@@ -200,42 +200,54 @@ export function ChatScreen() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
-      {/* Header */}
-      <header className="flex flex-shrink-0 items-center h-14 gap-3 border-b border-border bg-background px-4">
+
+      {/* ── Header ── */}
+      <header className="glass sticky top-0 z-10 flex flex-shrink-0 items-center h-14 gap-2 border-b px-3">
         <Button
           variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          size="icon-sm"
           onClick={() => navigate("/")}
+          className="text-[#bf5af2] -ml-1"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ChevronLeft className="h-5 w-5" strokeWidth={2.5} />
         </Button>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-foreground truncate">{contact.name}</p>
+
+        {/* Contact avatar + name */}
+        <div className="flex flex-1 items-center gap-2.5 min-w-0">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#bf5af2]/15 text-[13px] font-semibold text-[#bf5af2]">
+            {contact.name.trim()[0]?.toUpperCase() ?? "?"}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[15px] font-semibold text-foreground truncate leading-none">
+              {contact.name}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Protected contact</p>
+          </div>
         </div>
+
         <Button
           variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-          onClick={() => setShowDeleteConfirm(true)}
+          size="icon-sm"
+          onClick={() => setShowDelete(true)}
+          className="text-muted-foreground hover:text-destructive"
         >
           <Trash2 className="h-4 w-4" />
         </Button>
       </header>
 
-      {/* Delete confirm modal */}
+      {/* ── Delete modal ── */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-card border border-border p-5 shadow-lg">
-            <p className="text-sm font-medium text-foreground mb-1">Delete conversation?</p>
-            <p className="text-sm text-muted-foreground">
-              Messages will be removed from this thread only.
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-card border border-border p-5 shadow-xl animate-scale-in">
+            <p className="text-[15px] font-semibold text-foreground mb-1">Delete conversation?</p>
+            <p className="text-[14px] text-muted-foreground">
+              This removes messages from this thread only.
             </p>
-            <div className="mt-4 flex gap-2">
+            <div className="mt-5 flex gap-2.5">
               <Button
-                variant="outline"
+                variant="secondary"
                 className="flex-1"
-                onClick={() => setShowDeleteConfirm(false)}
+                onClick={() => setShowDelete(false)}
               >
                 Cancel
               </Button>
@@ -251,22 +263,23 @@ export function ChatScreen() {
         </div>
       )}
 
-      {/* Thread */}
+      {/* ── Thread ── */}
       <div className="flex-1 overflow-y-auto">
-        <div className="px-4 py-5 space-y-3 max-w-xl mx-auto">
+        <div className="px-4 py-5 space-y-2.5 max-w-xl mx-auto">
+
           {threadMessages.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary mb-3">
-                <ShieldCheck className="h-5 w-5 text-muted-foreground" />
+            <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-up">
+              <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-secondary mb-4 shadow-sm">
+                <Shield className="h-6 w-6 text-muted-foreground" strokeWidth={1.5} />
               </div>
-              <p className="text-sm font-medium text-foreground mb-1">Protected thread</p>
-              <p className="text-sm text-muted-foreground max-w-xs">
-                Type what you want to send {contact.name}. NOTSENT will intercept before it goes.
+              <p className="text-[16px] font-semibold text-foreground mb-1.5">Protected thread</p>
+              <p className="text-[14px] text-muted-foreground max-w-[260px] leading-relaxed">
+                Type what you want to send {contact.name}. We'll step in before it goes.
               </p>
               <button
                 type="button"
                 onClick={() => navigate(`/closure/${contact.id}`)}
-                className="mt-5 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="mt-6 flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
               >
                 <HeartCrack className="h-3.5 w-3.5" />
                 Get closure instead
@@ -278,24 +291,24 @@ export function ChatScreen() {
             <div
               key={m.id}
               className={cn(
-                "flex",
+                "flex animate-fade-in",
                 m.outcome === "sent" ? "justify-end" : "justify-start"
               )}
             >
               <div
                 className={cn(
-                  "max-w-[78%] rounded-2xl px-3.5 py-2.5",
+                  "max-w-[78%] rounded-[18px] px-3.5 py-2.5",
                   m.outcome === "sent"
-                    ? "bg-primary text-primary-foreground rounded-tr-sm"
-                    : "bg-secondary text-foreground rounded-tl-sm"
+                    ? "bg-foreground text-background rounded-br-[4px]"
+                    : "bg-secondary text-foreground rounded-bl-[4px]"
                 )}
               >
-                <p className="text-sm leading-relaxed">{m.text}</p>
+                <p className="text-[15px] leading-relaxed">{m.text}</p>
                 <div className="mt-1 flex items-center gap-1.5">
                   {m.outcome !== "sent" && (
-                    <span className="text-[11px] opacity-60 italic">Not sent</span>
+                    <span className="text-[11px] opacity-50 italic">Not sent</span>
                   )}
-                  <span className="text-[11px] opacity-55">
+                  <span className="text-[11px] opacity-45">
                     {new Date(m.timestamp).toLocaleTimeString([], {
                       hour: "numeric",
                       minute: "2-digit",
@@ -306,36 +319,50 @@ export function ChatScreen() {
             </div>
           ))}
 
-          {/* Intervention card */}
+          {/* ── Intervention card ── */}
           {intervention && (
-            <div className="rounded-2xl border border-border bg-card overflow-hidden mt-2">
-              <div className="px-4 py-3 border-b border-border bg-secondary/40">
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                  You were about to send
-                </p>
-                <p className="text-sm font-medium text-foreground mt-1">
+            <div className="rounded-2xl border border-border bg-card overflow-hidden mt-3 shadow-md animate-scale-in">
+              {/* Gradient accent bar */}
+              <div className="h-1 bg-brand-gradient" />
+
+              <div className="px-4 pt-3 pb-2 border-b border-border/60">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-[#bf5af2]" />
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                    NOTSENT
+                  </p>
+                </div>
+                <p className="text-[13px] text-muted-foreground">You were about to send:</p>
+                <p className="text-[14px] font-medium text-foreground mt-0.5">
                   "{intervention.messageAttempted}"
                 </p>
               </div>
-              <div className="px-4 py-3 min-h-[3.5rem]">
+
+              <div className="px-4 py-3 min-h-[4rem]">
                 {intervention.loading && !intervention.reply && !liveReply ? (
-                  <p className="text-sm text-muted-foreground italic">Thinking…</p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="typing-dot opacity-60" />
+                    <span className="typing-dot opacity-60" />
+                    <span className="typing-dot opacity-60" />
+                  </div>
                 ) : (
-                  <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                  <p className="text-[15px] text-foreground whitespace-pre-wrap leading-relaxed">
                     {liveReply ?? intervention.reply}
                   </p>
                 )}
                 {intervention.error && (
-                  <p className="text-sm text-destructive mt-1">{intervention.error}</p>
+                  <p className="text-[13px] text-destructive mt-1">{intervention.error}</p>
                 )}
                 <div ref={threadEndRef} />
               </div>
+
               {!intervention.loading && (
-                <div className="flex gap-2 px-4 pb-4 pt-1">
+                <div className="flex gap-2.5 px-4 pb-4 pt-1">
                   <Button
                     onClick={() => handleOutcome("intercepted")}
                     disabled={intervention.actionLoading}
-                    className="flex-1 h-10 text-sm"
+                    size="default"
+                    className="flex-1"
                   >
                     Won't send it
                   </Button>
@@ -343,7 +370,8 @@ export function ChatScreen() {
                     variant="outline"
                     onClick={() => handleOutcome("sent")}
                     disabled={intervention.actionLoading}
-                    className="flex-1 h-10 text-sm"
+                    size="default"
+                    className="flex-1"
                   >
                     Send anyway
                   </Button>
@@ -355,40 +383,41 @@ export function ChatScreen() {
         {!intervention && <div ref={threadEndRef} />}
       </div>
 
-      {/* Compose */}
+      {/* ── Compose bar ── */}
       <form
         onSubmit={handleSend}
-        className="flex flex-shrink-0 items-end gap-2 border-t border-border bg-background px-4 py-3"
+        className="glass flex flex-shrink-0 items-center gap-2 border-t px-3.5 py-2.5 pb-safe"
       >
-        {error && <p className="text-xs text-destructive absolute">{error}</p>}
-        <div className="flex flex-1 items-center gap-2">
-          <input
-            type="text"
-            placeholder={`Message ${contact.name}…`}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            disabled={sending}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend(e as unknown as React.FormEvent);
-              }
-            }}
-            className="flex-1 h-10 rounded-full bg-secondary px-4 text-sm text-foreground placeholder:text-muted-foreground border-0 outline-none focus:ring-2 focus:ring-ring/30 transition-shadow"
-          />
-          <button
-            type="submit"
-            disabled={sending || !input.trim()}
-            className={cn(
-              "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition-colors",
-              input.trim()
-                ? "bg-primary text-primary-foreground hover:bg-primary/85"
-                : "bg-secondary text-muted-foreground"
-            )}
-          >
-            <Send className="h-4 w-4" />
-          </button>
-        </div>
+        {error && (
+          <p className="absolute bottom-full mb-1 text-[12px] text-destructive px-4">{error}</p>
+        )}
+        <input
+          type="text"
+          placeholder={`Message ${contact.name}…`}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          disabled={sending}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend(e as unknown as React.FormEvent);
+            }
+          }}
+          className="flex-1 h-10 rounded-full bg-secondary px-4 text-[15px] text-foreground placeholder:text-muted-foreground border-0 outline-none focus:ring-2 focus:ring-[#bf5af2]/30 transition-shadow disabled:opacity-50"
+        />
+        <button
+          type="submit"
+          disabled={sending || !input.trim()}
+          aria-label="Send"
+          className={cn(
+            "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition-all duration-150 active:scale-90",
+            input.trim() && !sending
+              ? "bg-foreground text-background shadow-sm"
+              : "bg-secondary text-muted-foreground"
+          )}
+        >
+          <Send className="h-4 w-4" />
+        </button>
       </form>
     </div>
   );

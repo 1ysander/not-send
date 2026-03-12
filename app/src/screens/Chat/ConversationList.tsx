@@ -3,27 +3,42 @@ import { useNavigate } from "react-router-dom";
 import { getFlaggedContacts, getSessionsForContact } from "@/lib/storage";
 import { useConversationSocketOptional } from "@/contexts/ConversationSocketContext";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, Search, UserPlus } from "lucide-react";
+import { MessageCircle, Search, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 function getInitial(name: string): string {
   return name.trim() ? name.trim()[0].toUpperCase() : "?";
 }
 
 function formatTime(ts: number): string {
-  const now = Date.now();
+  const now  = Date.now();
   const diff = now - ts;
-  if (diff < 60_000) return "now";
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m`;
+  if (diff < 60_000)     return "now";
+  if (diff < 3_600_000)  return `${Math.floor(diff / 60_000)}m`;
   if (diff < 86_400_000) return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   return new Date(ts).toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+// Subtle avatar colors keyed by first letter
+const AVATAR_COLORS: Record<string, string> = {
+  A: "bg-[#bf5af2]/15 text-[#bf5af2]",
+  B: "bg-[#ff375f]/15 text-[#ff375f]",
+  C: "bg-[#30d158]/15 text-[#30d158]",
+  D: "bg-[#0a84ff]/15 text-[#0a84ff]",
+  E: "bg-[#ff9f0a]/15 text-[#ff9f0a]",
+  F: "bg-[#ff6961]/15 text-[#ff6961]",
+};
+function avatarColor(name: string): string {
+  const c = AVATAR_COLORS[name.trim()[0]?.toUpperCase()];
+  return c ?? "bg-secondary text-foreground";
+}
+
 export function ConversationList() {
-  const [search, setSearch] = useState("");
-  const socket = useConversationSocketOptional();
-  const updateVersion = socket?.updateVersion ?? 0;
-  const contacts = getFlaggedContacts();
-  const navigate = useNavigate();
+  const [search, setSearch]  = useState("");
+  const socket               = useConversationSocketOptional();
+  const updateVersion        = socket?.updateVersion ?? 0;
+  const contacts             = getFlaggedContacts();
+  const navigate             = useNavigate();
 
   const filtered = search.trim()
     ? contacts.filter(
@@ -35,86 +50,113 @@ export function ConversationList() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex-shrink-0 px-4 pt-6 pb-3 sm:px-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">Messages</h1>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
+      {/* ── Header ── */}
+      <div className="flex-shrink-0 px-4 pt-8 pb-3 sm:px-5">
+        <div className="flex items-end justify-between mb-5">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground mb-0.5">
+              NOTSENT
+            </p>
+            <h1 className="text-[28px] font-bold tracking-tight text-foreground leading-none">
+              Messages
+            </h1>
+          </div>
+          <button
+            type="button"
             onClick={() => navigate("/contacts")}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-foreground text-background transition-transform active:scale-90 shadow-sm"
+            aria-label="Add contact"
           >
-            <UserPlus className="h-4 w-4" />
-            <span className="text-xs">Add</span>
-          </Button>
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+          </button>
         </div>
+
         {contacts.length > 0 && (
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Search className="absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <input
               type="text"
               placeholder="Search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-9 pl-9 pr-3 rounded-xl bg-secondary text-sm text-foreground placeholder:text-muted-foreground border-0 outline-none focus:ring-2 focus:ring-ring/30 transition-shadow"
+              className="w-full h-10 pl-9 pr-4 rounded-xl bg-secondary text-[15px] text-foreground placeholder:text-muted-foreground border-0 outline-none focus:ring-2 focus:ring-[#bf5af2]/30 transition-shadow"
               aria-label="Search conversations"
             />
           </div>
         )}
       </div>
 
-      {/* List */}
+      {/* ── List ── */}
       <div className="flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary mb-4">
-              <MessageCircle className="h-6 w-6 text-muted-foreground" />
+          <div className="flex flex-col items-center justify-center py-24 px-6 text-center animate-fade-up">
+            <div className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-secondary mb-5 shadow-sm">
+              <MessageCircle className="h-7 w-7 text-muted-foreground" strokeWidth={1.5} />
             </div>
-            <p className="text-sm font-medium text-foreground mb-1">No conversations yet</p>
-            <p className="text-sm text-muted-foreground max-w-xs">
-              Add a contact. When you type here, NOTSENT intercepts send and helps you decide.
+            <p className="text-[17px] font-semibold text-foreground mb-1.5">
+              No conversations yet
+            </p>
+            <p className="text-[14px] text-muted-foreground max-w-[260px] leading-relaxed mb-6">
+              Add their contact. Every time you try to text them, we step in first.
             </p>
             <Button
-              size="sm"
-              className="mt-5 gap-2"
+              size="pill"
               onClick={() => navigate("/contacts")}
+              className="gap-2"
             >
-              <UserPlus className="h-4 w-4" />
+              <Plus className="h-4 w-4" strokeWidth={2.5} />
               Add contact
             </Button>
           </div>
         ) : (
-          <ul key={updateVersion}>
+          <ul key={updateVersion} className="divide-y divide-border/50">
             {filtered.map((contact) => {
               const sessions = getSessionsForContact(contact.id);
-              const last = sessions.length > 0
+              const last     = sessions.length > 0
                 ? [...sessions].sort((a, b) => b.timestamp - a.timestamp)[0]
                 : null;
-              const preview = last?.messageAttempted?.slice(0, 55) ?? "No messages yet";
+              const preview  = last?.messageAttempted?.slice(0, 55) ?? "Tap to start";
               const truncated = (last?.messageAttempted?.length ?? 0) > 55;
+              const intercepted = last?.outcome === "intercepted";
 
               return (
                 <li key={contact.id}>
                   <button
                     type="button"
                     onClick={() => navigate(`/chat/${contact.id}`)}
-                    className="flex w-full items-center gap-3 px-4 py-3.5 sm:px-6 hover:bg-secondary/60 active:bg-secondary transition-colors text-left"
+                    className={cn(
+                      "flex w-full items-center gap-3.5 px-4 py-3.5 sm:px-5",
+                      "hover:bg-secondary/50 active:bg-secondary/80 transition-colors text-left"
+                    )}
                   >
-                    <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-foreground">
+                    {/* Avatar */}
+                    <div className={cn(
+                      "flex h-[46px] w-[46px] flex-shrink-0 items-center justify-center rounded-full text-[17px] font-semibold",
+                      avatarColor(contact.name)
+                    )}>
                       {getInitial(contact.name)}
                     </div>
+
+                    {/* Text */}
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-foreground truncate">{contact.name}</p>
-                      <p className="text-sm text-muted-foreground truncate mt-0.5">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="text-[15px] font-semibold text-foreground truncate">
+                          {contact.name}
+                        </p>
+                        {last && (
+                          <span className="flex-shrink-0 text-[12px] text-muted-foreground">
+                            {formatTime(last.timestamp)}
+                          </span>
+                        )}
+                      </div>
+                      <p className={cn(
+                        "text-[14px] truncate mt-0.5",
+                        intercepted ? "text-muted-foreground italic" : "text-muted-foreground"
+                      )}>
+                        {intercepted && "Not sent · "}
                         {preview}{truncated ? "…" : ""}
                       </p>
                     </div>
-                    {last && (
-                      <span className="flex-shrink-0 text-xs text-muted-foreground">
-                        {formatTime(last.timestamp)}
-                      </span>
-                    )}
                   </button>
                 </li>
               );

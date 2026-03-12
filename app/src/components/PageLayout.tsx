@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/Container";
-import { ArrowLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PageLayoutProps {
@@ -17,23 +17,27 @@ export function PageLayout({ title, backTo, right, children, className }: PageLa
 
   return (
     <div className={cn("flex h-full flex-col", className)}>
-      <header className="flex flex-shrink-0 items-center h-14 gap-3 border-b border-border bg-background px-4 sm:px-6">
+      {/* Frosted glass header */}
+      <header className="sticky top-0 z-10 glass flex flex-shrink-0 items-center h-14 gap-2 border-b px-4 sm:px-5">
         {backTo != null ? (
           <Button
             variant="ghost"
-            size="icon"
+            size="icon-sm"
             onClick={() => navigate(backTo)}
             aria-label="Back"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            className="text-brand -ml-1"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ChevronLeft className="h-5 w-5" strokeWidth={2.5} />
           </Button>
         ) : (
-          <div className="w-8" />
+          <div className="w-7" />
         )}
-        <h1 className="flex-1 text-sm font-semibold tracking-tight text-foreground">{title}</h1>
+        <h1 className="flex-1 text-[17px] font-semibold tracking-tight text-foreground">
+          {title}
+        </h1>
         {right != null && <div className="flex-shrink-0">{right}</div>}
       </header>
+
       <div className="flex-1 overflow-y-auto">
         <Container bare narrow contentClassName="py-6 space-y-5">
           {children}

@@ -13,6 +13,7 @@
     "@radix-ui/react-separator": "^1.1.0",
     "@radix-ui/react-slot": "^1.2.4",
     "@react-oauth/google": "^0.13.4",
+    "@supabase/supabase-js": "^2.99.1",
     "@tailwindcss/vite": "^4.2.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -21,16 +22,16 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0",
     "socket.io-client": "^4.8.3",
-    "tailwind-merge": "^2.6.1",
-    "tailwindcss": "^4.2.1"
+    "tailwind-merge": "^2.6.1"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
     "@vitejs/plugin-react": "^4.2.1",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.47",
+    "autoprefixer": "^10.4.27",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^4.2.1",
     "typescript": "^5.2.2",
     "vite": "^5.1.0"
   }

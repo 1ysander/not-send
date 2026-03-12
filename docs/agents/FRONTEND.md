@@ -58,39 +58,36 @@ app/src/
 
 ```tsx
 <Routes>
-  <Route path="/login"          element={<PublicOnboardingOnly><LoginScreen /></PublicOnboardingOnly>} />
-  <Route path="/onboarding"     element={<PublicOnboardingOnly><AddContactScreen /></PublicOnboardingOnly>} />
-  <Route path="/onboarding/set" element={<PublicOnboardingOnly><YoureSetScreen /></PublicOnboardingOnly>} />
+  {/* Public */}
+  <Route path="/"        element={<HomeScreen />} />
+  <Route path="/upload"  element={<UploadScreen />} />
+  <Route path="/login"   element={<LoginScreen />} />
 
-  <Route path="/" element={
-    <OnboardingGuard>
-      <ConversationSocketProvider>
-        <AppShell />
-      </ConversationSocketProvider>
-    </OnboardingGuard>
+  {/* Main app — requires uploaded conversation */}
+  <Route path="/chat" element={
+    <UploadGuard>
+      <AppShell />
+    </UploadGuard>
   }>
-    <Route index             element={<ConversationList />} />
-    <Route path="ai-chat"    element={<AIChatScreen />} />
-    <Route path="conversations" element={<ManageConversationsScreen />} />
-    <Route path="stats"      element={<StatsScreen />} />
-    <Route path="settings"   element={<SettingsScreen />} />
-    <Route path="chat/:contactId" element={<ChatScreen />} />
-    <Route path="contacts"   element={<ContactsScreen />} />
+    <Route index           element={<ChatScreen />} />
+    <Route path="ai-chat"  element={<AIChatScreen />} />
+    <Route path="stats"    element={<StatsScreen />} />
+    <Route path="settings" element={<SettingsScreen />} />
   </Route>
 
-  <Route path="/intervention" element={<InterventionChat />} />
-  <Route path="*"            element={<Navigate to="/" replace />} />
+  {/* Full-screen AI flows — no nav bar */}
+  <Route path="/intervention" element={<UploadGuard><InterventionChat /></UploadGuard>} />
+  <Route path="/closure"      element={<UploadGuard><ClosureScreen /></UploadGuard>} />
+
+  <Route path="*" element={<Navigate to="/" replace />} />
 </Routes>
 ```
 
-Guards:
+Guard:
 ```tsx
-function OnboardingGuard({ children }: { children: React.ReactNode }) {
-  if (!hasCompletedOnboarding()) return <Navigate to="/onboarding" replace />;
-  return <>{children}</>;
-}
-function PublicOnboardingOnly({ children }: { children: React.ReactNode }) {
-  if (hasCompletedOnboarding()) return <Navigate to="/" replace />;
+function UploadGuard({ children }: { children: React.ReactNode }) {
+  // Only gate on whether a conversation has been uploaded (partnerContext in localStorage)
+  if (!getPartnerContext()) return <Navigate to="/upload" replace />;
   return <>{children}</>;
 }
 ```
@@ -99,14 +96,13 @@ function PublicOnboardingOnly({ children }: { children: React.ReactNode }) {
 
 ## Tab bar (AppShell.tsx)
 
-Five tabs in this exact order:
-1. **Chats** `/` — icon: MessageSquare
-2. **AI Chat** `/ai-chat` — icon: Bot
-3. **Conversations** `/conversations` — icon: History
-4. **Stats** `/stats` — icon: BarChart2
-5. **Settings** `/settings` — icon: Settings
+Four tabs in this exact order (only shown inside `/chat/*`):
+1. **Chat** `/chat` — icon: MessageSquare
+2. **AI Chat** `/chat/ai-chat` — icon: Bot
+3. **Stats** `/chat/stats` — icon: BarChart2
+4. **Settings** `/chat/settings` — icon: Settings
 
-Tab bar is `fixed bottom-0 w-full` with safe area padding (`pb-safe` or `pb-4`). Active tab has full-color icon; inactive tabs are muted (`text-muted-foreground`). Never show the tab bar on `/intervention`.
+Tab bar is `fixed bottom-0 w-full`. Never show on `/intervention` or `/closure` — those are full-screen flows.
 
 ```tsx
 // AppShell.tsx skeleton
@@ -144,19 +140,41 @@ export function AppShell() {
 
 ---
 
+## Upload flow (entry point — critical path)
+
+```
+HomeScreen
+  → user clicks "Upload your conversation"
+  → navigate("/upload")
+
+UploadScreen
+  → user picks .txt file (iMessage export from iPhone)
+  → POST /api/parse-imessage (multipart/form-data, field: "file")
+  → show parsing progress indicator
+  → on success: receive { partnerName, messageCount, sampleMessages[], conversationHistory[] }
+  → setPartnerContextLocal({ partnerName, sampleMessages })
+  → setConversationHistoryLocal(conversationHistory)
+  → navigate("/chat")
+```
+
+**How to export from iPhone:** Settings → [contact name] → Export. Users need clear instructions on the upload screen.
+
+---
+
 ## Intervention flow (critical path — never break this)
 
 ```
 ChatScreen
-  → user types → hits Send button (data-testid="send-button")
-  → addSession({ id, contactId, timestamp, messageAttempted, outcome: "draft" })
+  → user types in "What were you going to say?" input
+  → hits "Intercept" button (data-testid="intercept-button")
+  → addSession({ id, timestamp, messageAttempted, outcome: "draft" })
   → POST /api/session via createSession(messageAttempted, userContext, deviceId) from api.ts
-  → sessionStorage.setItem("notsent_intervention", JSON.stringify({ sessionId, messageAttempted, contactId }))
+  → sessionStorage.setItem("notsent_intervention", JSON.stringify({ sessionId, messageAttempted }))
   → navigate("/intervention")
 
 InterventionChat (no AppShell — standalone full-screen)
   → read InterventionState from sessionStorage
-  → if null → navigate("/") immediately
+  → if null → navigate("/chat") immediately
   → POST /api/chat (SSE stream) with { sessionId, messageAttempted, messages: [], deviceId, userContext }
   → render tokens as they arrive (data-testid="ai-message")
   → show two buttons only after isStreaming = false:
@@ -164,12 +182,27 @@ InterventionChat (no AppShell — standalone full-screen)
         → PATCH /api/session/:id { outcome: "intercepted" }
         → updateLocalSessionOutcome(sessionId, "intercepted")
         → sessionStorage.removeItem("notsent_intervention")
-        → navigate(-1)
+        → navigate("/chat")
       "Send anyway" (data-testid="send-anyway-button")
         → PATCH /api/session/:id { outcome: "sent" }
         → updateLocalSessionOutcome(sessionId, "sent")
         → sessionStorage.removeItem("notsent_intervention")
-        → navigate(-1)
+        → navigate("/chat")
+```
+
+## Closure flow
+
+```
+ChatScreen
+  → user clicks "Talk to [partnerName]" button
+  → navigate("/closure")
+
+ClosureScreen (no AppShell — standalone full-screen)
+  → reads partnerContext from getPartnerContext()
+  → if null → navigate("/chat") immediately
+  → POST /api/chat/closure (SSE) with { messages: [], partnerContext, userContext, deviceId }
+  → free chat — AI plays the ex's voice
+  → "End conversation" button → navigate("/chat")
 ```
 
 ---
@@ -495,28 +528,41 @@ Never show a blank screen while loading. Never swallow errors silently.
 
 ---
 
+## Website design principles (non-negotiable)
+
+NOTSENT is a **website product** — it must look emotionally compelling and polished. This is the first thing investors, users, and press see.
+
+- **No generic UI.** Do not use default shadcn/ui themes. Use custom color palette, typography, and spacing.
+- **Emotional tone.** The design should feel calm, intimate, and slightly melancholy — not clinical or app-like.
+- **Generous whitespace.** Full-viewport sections, breathing room, not a cramped dashboard.
+- **Hero matters.** The HomeScreen headline and CTA are the entire product pitch. Get them right.
+- **Upload UX matters most.** The upload screen is where users first trust you with something personal. It must feel safe and intentional.
+
+---
+
 ## What to build next (in order)
 
-### 1. Closure screen (P1)
-- Path: `/closure/:contactId` (nested in AppShell)
-- File: `screens/Closure/ClosureScreen.tsx`
+### 1. HomeScreen + UploadScreen (P0 — the entry point)
+- `screens/Home/HomeScreen.tsx` — hero headline, CTA to upload, brief explanation of what NOTSENT does
+- `screens/Upload/UploadScreen.tsx` — file picker, upload progress, parse result preview ("Found 122 messages with Alex")
+- Endpoint: `POST /api/parse-imessage`
+
+### 2. ChatScreen redesign (P0 — upload-first)
+- Remove "add contact" flow entirely
+- Show uploaded conversation summary at top
+- Two primary CTAs: "Intercept a message" + "Talk to [name]"
+
+### 3. ClosureScreen (P1)
+- `screens/Closure/ClosureScreen.tsx`
 - Endpoint: `POST /api/chat/closure`
-- Read partner context from `getPartnerContext()`, seed into stream body
-- Same SSE pattern as intervention but no "won't send it" / "send anyway" — just free chat
-- Add tab or entry point from ChatScreen ("Get closure with AI")
+- Full-screen, no tab bar
+- Entry from ChatScreen "Talk to [name]" button
 
-### 2. Streak counter on Stats (P2)
-- Calculate days since last session with `outcome: "sent"` from `getSessions()`
-- Show as "X days no contact" with calendar icon
-- Store streak-break timestamps in localStorage via new storage function
+### 4. Streak counter on Stats (P2)
+- Days since last `outcome: "sent"` session
+- "X days no contact" with calendar icon
 
-### 3. Push notification setup (P2)
-- PWA: add `manifest.json` + service worker
-- Request notification permission on first intervention
-- Service worker intercepts fetch to `/intervention` route as trigger hint
-
-### 4. Supabase auth (P1)
+### 5. Supabase auth (P1)
 - Create `lib/supabase.ts` with client
-- Replace `OnboardingGuard` with session check
-- Replace `getDeviceId()` with `supabase.auth.getSession().user.id`
+- Replace `UploadGuard` with session check
 - See `SUPABASE.md` for full migration plan

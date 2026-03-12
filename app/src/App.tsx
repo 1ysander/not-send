@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { hasCompletedOnboarding } from "./lib/storage";
+import { supabaseEnabled } from "./lib/supabase";
+import { useAuth } from "./context/AuthContext";
 import { ConversationSocketProvider } from "./contexts/ConversationSocketContext";
 import { AppShell } from "./components/AppShell";
 import { AddContactScreen } from "./screens/Onboarding/AddContactScreen";
@@ -14,13 +16,35 @@ import { SettingsScreen } from "./screens/Settings/SettingsScreen";
 import { ContactsScreen } from "./screens/Contacts/ContactsScreen";
 import { AIChatScreen } from "./screens/AIChat/AIChatScreen";
 
-/** Single guard: onboarding vs main app. No nested layout wrapper. */
-function OnboardingGuard({ children }: { children: React.ReactNode }) {
+/** Guards the main app: requires auth (when Supabase enabled) + onboarding. */
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+
+  if (!supabaseEnabled) {
+    if (!hasCompletedOnboarding()) return <Navigate to="/onboarding" replace />;
+    return <>{children}</>;
+  }
+
+  if (loading) return (
+    <div className="flex min-h-screen items-center justify-center">
+      <p className="text-sm text-muted-foreground">Loading…</p>
+    </div>
+  );
+  if (!user) return <Navigate to="/login" replace />;
   if (!hasCompletedOnboarding()) return <Navigate to="/onboarding" replace />;
   return <>{children}</>;
 }
 
 function PublicOnboardingOnly({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+
+  if (!supabaseEnabled) {
+    if (hasCompletedOnboarding()) return <Navigate to="/" replace />;
+    return <>{children}</>;
+  }
+
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
   if (hasCompletedOnboarding()) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
@@ -31,7 +55,7 @@ export default function App() {
       <Route path="/login" element={<LoginScreen />} />
       <Route path="/onboarding" element={<PublicOnboardingOnly><AddContactScreen /></PublicOnboardingOnly>} />
       <Route path="/onboarding/set" element={<PublicOnboardingOnly><YoureSetScreen /></PublicOnboardingOnly>} />
-      <Route path="/" element={<OnboardingGuard><ConversationSocketProvider><AppShell /></ConversationSocketProvider></OnboardingGuard>}>
+      <Route path="/" element={<AuthGuard><ConversationSocketProvider><AppShell /></ConversationSocketProvider></AuthGuard>}>
         <Route index element={<ConversationList />} />
         <Route path="ai-chat" element={<AIChatScreen />} />
         <Route path="conversations" element={<ManageConversationsScreen />} />

@@ -4,7 +4,7 @@ import { getFlaggedContacts, getDeviceId, getUserContext, getPartnerContext } fr
 import { streamClosureChat } from "@/api";
 import type { PartnerContext } from "@/api";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Send, Info } from "lucide-react";
+import { ChevronLeft, Send, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
@@ -14,23 +14,22 @@ interface ChatMessage {
 
 export function ClosureScreen() {
   const { contactId } = useParams<{ contactId: string }>();
-  const navigate = useNavigate();
-  const contacts = getFlaggedContacts();
-  const contact = contacts.find((c) => c.id === contactId) ?? null;
+  const navigate      = useNavigate();
+  const contacts      = getFlaggedContacts();
+  const contact       = contacts.find((c) => c.id === contactId) ?? null;
 
-  const partnerCtx = getPartnerContext();
-  // Build effective PartnerContext: prefer saved ctx, fallback to contact name
+  const partnerCtx       = getPartnerContext();
   const effectivePartner: PartnerContext = partnerCtx ?? {
     partnerName: contact?.name ?? "them",
   };
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [input, setInput]       = useState("");
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(true);
-  const endRef = useRef<HTMLDivElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const endRef                  = useRef<HTMLDivElement>(null);
+  const abortRef                = useRef<AbortController | null>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -41,7 +40,7 @@ export function ClosureScreen() {
   if (!contact) {
     return (
       <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-        <p className="text-sm text-muted-foreground mb-3">Contact not found.</p>
+        <p className="text-[14px] text-muted-foreground mb-3">Contact not found.</p>
         <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
           Back to Messages
         </Button>
@@ -62,7 +61,7 @@ export function ClosureScreen() {
     setMessages(updated);
     setLoading(true);
 
-    const deviceId = getDeviceId();
+    const deviceId    = getDeviceId();
     const userContext = getUserContext();
 
     try {
@@ -92,44 +91,54 @@ export function ClosureScreen() {
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Header */}
-      <header className="flex flex-shrink-0 items-center h-14 gap-3 border-b border-border bg-background px-4">
+
+      {/* ── Header ── */}
+      <header className="glass sticky top-0 z-10 flex flex-shrink-0 items-center h-14 gap-2 border-b px-3">
         <Button
           variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          size="icon-sm"
           onClick={() => navigate(`/chat/${contactId}`)}
+          className="text-[#bf5af2] -ml-1"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ChevronLeft className="h-5 w-5" strokeWidth={2.5} />
         </Button>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-foreground truncate">{partnerName}</p>
-          <p className="text-[11px] text-muted-foreground leading-none mt-0.5">Closure mode</p>
+          <p className="text-[15px] font-semibold text-foreground truncate leading-none">
+            {partnerName}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Closure mode</p>
         </div>
         <Button
           variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground"
+          size="icon-sm"
           onClick={() => setShowInfo((s) => !s)}
           aria-label="About closure mode"
+          className="text-muted-foreground"
         >
-          <Info className="h-4 w-4" />
+          {showInfo ? <X className="h-4 w-4" /> : <Info className="h-4 w-4" />}
         </Button>
       </header>
 
-      {/* Messages */}
+      {/* ── Messages ── */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
+
         {/* Info banner */}
         {showInfo && (
-          <div className="rounded-xl bg-secondary border border-border p-3.5 mb-4 max-w-xl mx-auto">
-            <p className="text-xs font-semibold text-foreground mb-1">What is closure mode?</p>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              AI responds as {partnerName} based on their known style. This is a safe space to say
-              what you need to say — nothing is sent to anyone.
-            </p>
+          <div className="rounded-2xl border border-border bg-card p-4 mb-4 max-w-xl mx-auto animate-scale-in shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <p className="text-[14px] font-semibold text-foreground mb-1">
+                  What is closure mode?
+                </p>
+                <p className="text-[13px] text-muted-foreground leading-relaxed">
+                  AI responds as {partnerName} — a safe space to say what you need to say.
+                  Nothing is sent to anyone.
+                </p>
+              </div>
+            </div>
             <button
               type="button"
-              className="text-xs text-muted-foreground underline underline-offset-2 mt-2"
+              className="mt-3 text-[13px] font-medium text-[#bf5af2]"
               onClick={() => setShowInfo(false)}
             >
               Got it
@@ -139,38 +148,45 @@ export function ClosureScreen() {
 
         {/* Empty state */}
         {messages.length === 0 && !showInfo && (
-          <div className="flex flex-col items-center justify-center py-16 text-center max-w-xl mx-auto">
-            <p className="text-sm font-medium text-foreground mb-1">
+          <div className="flex flex-col items-center justify-center py-20 text-center max-w-xl mx-auto animate-fade-up">
+            <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-[#bf5af2]/15 text-[22px] font-semibold text-[#bf5af2] mb-4">
+              {partnerName[0]?.toUpperCase() ?? "?"}
+            </div>
+            <p className="text-[17px] font-semibold text-foreground mb-1.5">
               Say what you need to say
             </p>
-            <p className="text-sm text-muted-foreground max-w-xs">
+            <p className="text-[14px] text-muted-foreground max-w-[240px] leading-relaxed">
               {partnerName} is here. This is your chance.
             </p>
           </div>
         )}
 
         {/* Chat bubbles */}
-        <div className="space-y-2 max-w-xl mx-auto">
+        <div className="space-y-2.5 max-w-xl mx-auto">
           {messages.map((m, i) => (
             <div
               key={i}
-              className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}
+              className={cn("flex animate-fade-in", m.role === "user" ? "justify-end" : "justify-start")}
             >
               {m.role === "assistant" && (
-                <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-foreground mr-2 mt-1 self-end">
+                <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#bf5af2]/15 text-[12px] font-semibold text-[#bf5af2] mr-2 mt-1 self-end">
                   {partnerName[0]?.toUpperCase() ?? "?"}
                 </div>
               )}
               <div
                 className={cn(
-                  "max-w-[75%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
+                  "max-w-[75%] rounded-[18px] px-3.5 py-2.5 text-[15px] leading-relaxed",
                   m.role === "user"
-                    ? "bg-primary text-primary-foreground rounded-tr-sm"
-                    : "bg-secondary text-foreground rounded-tl-sm"
+                    ? "bg-foreground text-background rounded-br-[4px]"
+                    : "bg-secondary text-foreground rounded-bl-[4px]"
                 )}
               >
                 {m.role === "assistant" && !m.content && loading ? (
-                  <span className="text-muted-foreground italic text-xs">typing…</span>
+                  <div className="flex items-center gap-1.5 py-1">
+                    <span className="typing-dot text-muted-foreground" />
+                    <span className="typing-dot text-muted-foreground" />
+                    <span className="typing-dot text-muted-foreground" />
+                  </div>
                 ) : (
                   <span className="whitespace-pre-wrap">{m.content}</span>
                 )}
@@ -180,15 +196,15 @@ export function ClosureScreen() {
         </div>
 
         {error && (
-          <p className="mt-3 text-xs text-destructive text-center">{error}</p>
+          <p className="mt-3 text-[12px] text-destructive text-center">{error}</p>
         )}
         <div ref={endRef} />
       </div>
 
-      {/* Input */}
+      {/* ── Input ── */}
       <form
         onSubmit={handleSubmit}
-        className="flex-shrink-0 flex items-center gap-2 border-t border-border bg-background px-4 py-3"
+        className="glass flex-shrink-0 flex items-center gap-2 border-t px-3.5 py-2.5 pb-safe"
       >
         <input
           type="text"
@@ -202,15 +218,16 @@ export function ClosureScreen() {
               handleSubmit(e as unknown as React.FormEvent);
             }
           }}
-          className="flex-1 h-10 rounded-full bg-secondary px-4 text-sm text-foreground placeholder:text-muted-foreground border-0 outline-none focus:ring-2 focus:ring-ring/30 transition-shadow disabled:opacity-50"
+          className="flex-1 h-10 rounded-full bg-secondary px-4 text-[15px] text-foreground placeholder:text-muted-foreground border-0 outline-none focus:ring-2 focus:ring-[#bf5af2]/30 transition-shadow disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={loading || !input.trim()}
+          aria-label="Send"
           className={cn(
-            "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition-colors",
+            "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition-all duration-150 active:scale-90",
             input.trim() && !loading
-              ? "bg-primary text-primary-foreground hover:bg-primary/85"
+              ? "bg-foreground text-background shadow-sm"
               : "bg-secondary text-muted-foreground"
           )}
         >

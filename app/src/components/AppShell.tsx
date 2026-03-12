@@ -3,12 +3,12 @@ import { MessageCircle, Bot, Inbox, Users, BarChart3, Settings } from "lucide-re
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { path: "/", end: true, label: "Chats", icon: MessageCircle },
-  { path: "/ai-chat", end: false, label: "AI Chat", icon: Bot },
-  { path: "/conversations", end: false, label: "Inbox", icon: Inbox },
-  { path: "/contacts", end: false, label: "Contacts", icon: Users },
-  { path: "/stats", end: false, label: "Stats", icon: BarChart3 },
-  { path: "/settings", end: false, label: "Settings", icon: Settings },
+  { path: "/",             end: true,  label: "Chats",    icon: MessageCircle },
+  { path: "/ai-chat",     end: false, label: "AI Chat",  icon: Bot },
+  { path: "/conversations", end: false, label: "Inbox",  icon: Inbox },
+  { path: "/contacts",    end: false, label: "Contacts", icon: Users },
+  { path: "/stats",       end: false, label: "Stats",    icon: BarChart3 },
+  { path: "/settings",    end: false, label: "Settings", icon: Settings },
 ] as const;
 
 function isActive(path: string, end: boolean, current: string) {
@@ -17,18 +17,23 @@ function isActive(path: string, end: boolean, current: string) {
 }
 
 export function AppShell() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const pathname = location.pathname;
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const pathname  = location.pathname;
 
   return (
     <div className="flex h-screen flex-col bg-background md:flex-row">
-      {/* Desktop sidebar — Linear style */}
-      <aside className="hidden w-52 flex-shrink-0 border-r border-border bg-background md:flex md:flex-col">
-        <div className="flex h-14 items-center px-5 border-b border-border">
-          <span className="text-sm font-semibold tracking-tight text-foreground">NOTSENT</span>
+
+      {/* ── Desktop sidebar ── */}
+      <aside className="hidden w-56 flex-shrink-0 border-r border-border/60 md:flex md:flex-col">
+        {/* Wordmark */}
+        <div className="flex h-16 items-center px-5">
+          <span className="text-[15px] font-semibold tracking-tight text-foreground">
+            NOTSENT
+          </span>
         </div>
-        <nav className="flex-1 p-2 space-y-0.5">
+
+        <nav className="flex-1 px-3 pb-4 space-y-0.5">
           {navItems.map(({ path, end, label, icon: Icon }) => {
             const active = isActive(path, end, pathname);
             return (
@@ -37,13 +42,13 @@ export function AppShell() {
                 type="button"
                 onClick={() => navigate(path)}
                 className={cn(
-                  "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
+                  "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] transition-all duration-150",
                   active
                     ? "bg-secondary text-foreground font-medium"
-                    : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                    : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
                 )}
               >
-                <Icon className="h-4 w-4 flex-shrink-0" />
+                <Icon className={cn("h-[18px] w-[18px] flex-shrink-0 transition-colors", active ? "text-foreground" : "text-muted-foreground")} />
                 {label}
               </button>
             );
@@ -51,12 +56,12 @@ export function AppShell() {
         </nav>
       </aside>
 
-      {/* Main content */}
+      {/* ── Main content ── */}
       <main className="flex flex-1 flex-col overflow-hidden md:min-w-0">
         <div
           className={cn(
             "flex-1 flex flex-col min-h-0 overflow-hidden",
-            pathname.startsWith("/chat/")
+            pathname.startsWith("/chat/") || pathname.startsWith("/closure/")
               ? "py-0"
               : "overflow-y-auto"
           )}
@@ -64,9 +69,12 @@ export function AppShell() {
           <Outlet />
         </div>
 
-        {/* Mobile bottom nav — iOS style */}
+        {/* ── Mobile bottom nav — frosted glass iOS style ── */}
         <nav
-          className="flex items-end justify-around border-t border-border bg-background px-1 pt-2 pb-2 safe-bottom md:hidden"
+          className={cn(
+            "flex items-end justify-around glass border-t px-1 pt-2 pb-safe md:hidden",
+            "transition-all duration-200"
+          )}
           role="tablist"
           aria-label="Main navigation"
         >
@@ -79,25 +87,26 @@ export function AppShell() {
                 role="tab"
                 aria-current={active ? "page" : undefined}
                 onClick={() => navigate(path)}
-                className="flex flex-col items-center gap-1 min-w-[48px] py-1 px-2"
+                className="flex flex-col items-center gap-[3px] min-w-[48px] py-1 px-2 transition-transform active:scale-90"
               >
                 <span
                   className={cn(
-                    "flex items-center justify-center rounded-xl px-3 py-1.5 transition-colors",
-                    active ? "bg-secondary" : "bg-transparent"
+                    "flex items-center justify-center rounded-[10px] px-3 py-1.5 transition-all duration-200",
+                    active ? "bg-foreground/[0.07]" : "bg-transparent"
                   )}
                 >
                   <Icon
                     className={cn(
-                      "h-5 w-5 transition-colors",
+                      "h-[22px] w-[22px] transition-colors duration-200",
                       active ? "text-foreground" : "text-muted-foreground"
                     )}
+                    strokeWidth={active ? 2.2 : 1.7}
                   />
                 </span>
                 <span
                   className={cn(
-                    "text-[10px] font-medium leading-none tracking-tight",
-                    active ? "text-foreground" : "text-muted-foreground"
+                    "text-[10px] leading-none tracking-tight transition-colors duration-200",
+                    active ? "text-foreground font-semibold" : "text-muted-foreground font-medium"
                   )}
                 >
                   {label}

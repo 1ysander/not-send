@@ -4,17 +4,18 @@ import { streamReviewResponse, recordOutcome } from "@/core";
 import { webReviewTransport } from "@/adapters/webTransport";
 import { updateLocalSessionOutcome, getDeviceId, getUserContext } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ChevronLeft, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function InterventionChat() {
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId]               = useState<string | null>(null);
   const [messageAttempted, setMessageAttempted] = useState<string>("");
-  const [reply, setReply] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [actionLoading, setActionLoading] = useState(false);
-  const navigate = useNavigate();
-  const replyEndRef = useRef<HTMLDivElement>(null);
+  const [reply, setReply]                       = useState("");
+  const [loading, setLoading]                   = useState(true);
+  const [error, setError]                       = useState("");
+  const [actionLoading, setActionLoading]       = useState(false);
+  const navigate                                = useNavigate();
+  const replyEndRef                             = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const sid = sessionStorage.getItem("notsent_sessionId");
@@ -28,14 +29,13 @@ export function InterventionChat() {
       return;
     }
 
-    const isLocalSession = sid.startsWith("local_");
-    if (isLocalSession) {
+    if (sid.startsWith("local_")) {
       setLoading(false);
       setError("Backend is not running. Start the backend to use the AI review.");
       return;
     }
 
-    const deviceId = getDeviceId();
+    const deviceId   = getDeviceId();
     const userContext = getUserContext();
     streamReviewResponse(
       webReviewTransport,
@@ -74,7 +74,7 @@ export function InterventionChat() {
 
   async function handleOutcome(outcome: "intercepted" | "sent") {
     const contactId = sessionStorage.getItem("notsent_contactId");
-    const returnTo = contactId ? `/chat/${contactId}` : "/";
+    const returnTo  = contactId ? `/chat/${contactId}` : "/";
 
     if (!sessionId || sessionId.startsWith("local_")) {
       updateLocalSessionOutcome(sessionId ?? "", outcome);
@@ -96,13 +96,13 @@ export function InterventionChat() {
     }
   }
 
-  const errorOnly = error && !sessionId;
+  const errorOnly  = error && !sessionId;
   const localError = error && sessionId?.startsWith("local_");
 
   if (errorOnly || localError) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background px-6 text-center">
-        <p className="text-sm text-destructive font-medium mb-4">{error}</p>
+        <p className="text-[14px] text-destructive font-medium mb-4">{error}</p>
         <Button
           onClick={() => {
             if (localError) updateLocalSessionOutcome(sessionId!, "intercepted");
@@ -117,63 +117,93 @@ export function InterventionChat() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      {/* Header */}
-      <header className="flex items-center h-14 px-4 border-b border-border">
+
+      {/* ── Gradient hero bar ── */}
+      <div className="h-1 bg-brand-gradient" />
+
+      {/* ── Header ── */}
+      <header className="glass flex items-center h-14 px-3 border-b">
         <Button
           variant="ghost"
-          size="icon"
+          size="icon-sm"
           onClick={goBack}
           aria-label="Back"
-          className="h-8 w-8 text-muted-foreground hover:text-foreground mr-2"
+          className="text-[#bf5af2] -ml-1 mr-2"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ChevronLeft className="h-5 w-5" strokeWidth={2.5} />
         </Button>
-        <p className="text-sm font-semibold text-foreground">Intervention</p>
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-gradient">
+            <Sparkles className="h-3.5 w-3.5 text-white" />
+          </div>
+          <div>
+            <p className="text-[15px] font-semibold text-foreground leading-none">Intervention</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">NOTSENT stepped in</p>
+          </div>
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 max-w-xl mx-auto w-full space-y-4">
-        {/* Intercepted message */}
+
+        {/* ── Intercepted message ── */}
         {messageAttempted && (
-          <div className="rounded-xl border border-border bg-secondary/40 p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+          <div className="rounded-2xl border border-border/60 bg-secondary/50 p-4 animate-fade-up">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground mb-2">
               You were about to send
             </p>
-            <p className="text-sm text-foreground font-medium">"{messageAttempted}"</p>
+            <p className="text-[15px] text-foreground font-medium leading-relaxed">
+              "{messageAttempted}"
+            </p>
           </div>
         )}
 
-        {/* AI response */}
-        <div className="rounded-xl border border-border bg-card p-4 min-h-[7rem]">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-            NOTSENT
-          </p>
-          {loading && !reply && (
-            <p className="text-sm text-muted-foreground italic">Thinking…</p>
-          )}
-          {reply && (
-            <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{reply}</p>
-          )}
-          {error && reply && (
-            <p className="mt-2 text-sm text-destructive">{error}</p>
-          )}
-          <div ref={replyEndRef} />
+        {/* ── AI response card ── */}
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-md animate-fade-up delay-100">
+          <div className="h-0.5 bg-brand-gradient" />
+          <div className="p-4">
+            <div className="flex items-center gap-1.5 mb-3">
+              <Sparkles className="h-3.5 w-3.5 text-[#bf5af2]" />
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                NOTSENT
+              </p>
+            </div>
+
+            {loading && !reply && (
+              <div className="flex items-center gap-1.5 py-2">
+                <span className="typing-dot text-muted-foreground" />
+                <span className="typing-dot text-muted-foreground" />
+                <span className="typing-dot text-muted-foreground" />
+              </div>
+            )}
+            {reply && (
+              <p className="text-[15px] text-foreground whitespace-pre-wrap leading-relaxed">
+                {reply}
+              </p>
+            )}
+            {error && reply && (
+              <p className="mt-2 text-[13px] text-destructive">{error}</p>
+            )}
+            <div ref={replyEndRef} />
+          </div>
         </div>
 
-        {/* Actions */}
+        {/* ── CTA buttons ── */}
         {!loading && (
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-col gap-2.5 pt-1 animate-fade-up delay-200">
             <Button
               onClick={() => handleOutcome("intercepted")}
               disabled={actionLoading}
-              className="flex-1 h-11"
+              size="default"
+              className="w-full"
             >
-              Won't send it
+              I won't send it
             </Button>
             <Button
               variant="outline"
               onClick={() => handleOutcome("sent")}
               disabled={actionLoading}
-              className="flex-1 h-11"
+              size="default"
+              className={cn("w-full", actionLoading && "opacity-50")}
             >
               Send anyway
             </Button>
