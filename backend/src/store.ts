@@ -68,7 +68,7 @@ export function getConversationHistory(sessionId: string): ConversationTurn[] {
 
 /** Return last N turns across all sessions for a device (for "recent context" in prompt). */
 export function getRecentHistoryForDevice(
-  deviceId: string,
+  _deviceId: string,
   limit: number = 20
 ): ConversationTurn[] {
   const all: ConversationTurn[] = [];
@@ -95,4 +95,12 @@ export function setPartnerContext(deviceId: string, context: PartnerContext): vo
 
 export function getPartnerContext(deviceId: string): PartnerContext | undefined {
   return partnerContextByDevice.get(deviceId);
+}
+
+export function getStats(): { interceptionsCount: number; messagesNeverSentCount: number } {
+  const all = Array.from(sessions.values());
+  return {
+    interceptionsCount: all.filter((s) => s.outcome === "intercepted").length,
+    messagesNeverSentCount: all.filter((s) => s.outcome !== "sent").length,
+  };
 }
