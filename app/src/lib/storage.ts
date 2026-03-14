@@ -246,11 +246,16 @@ export function getMoodLog(): MoodEntry[] {
   }
 }
 
-export function logMood(score: number, note?: string): void {
+export function logMood(score: number, note?: string, journal?: string): void {
   const log = getMoodLog();
   const today = todayDateString();
   const idx = log.findIndex((e) => e.date === today);
-  const entry = { date: today, score, ...(note !== undefined ? { note } : {}) };
+  const entry: MoodEntry = {
+    date: today,
+    score,
+    ...(note !== undefined ? { note } : {}),
+    ...(journal !== undefined ? { journal } : {}),
+  };
   if (idx >= 0) {
     log[idx] = { ...log[idx], ...entry };
   } else {
@@ -265,4 +270,50 @@ export function getTodayEntry(): MoodEntry | null {
 
 export function getTodayMood(): number | null {
   return getTodayEntry()?.score ?? null;
+}
+
+// ─── No-contact date ─────────────────────────────────────────────────────────
+
+const NO_CONTACT_SINCE_KEY = "notsent_no_contact_since";
+
+/**
+ * Get the ISO date string (YYYY-MM-DD) the user manually set as their
+ * no-contact start date, or null if not set.
+ */
+export function getNoContactSince(): string | null {
+  return localStorage.getItem(NO_CONTACT_SINCE_KEY);
+}
+
+/**
+ * Save the no-contact start date as an ISO date string (YYYY-MM-DD).
+ */
+export function setNoContactSince(dateStr: string): void {
+  localStorage.setItem(NO_CONTACT_SINCE_KEY, dateStr);
+}
+
+/**
+ * Clear the no-contact start date (user wants to reset the counter).
+ */
+export function clearNoContactSince(): void {
+  localStorage.removeItem(NO_CONTACT_SINCE_KEY);
+}
+
+// ─── Product mode ─────────────────────────────────────────────────────────────
+
+export const PRODUCT_MODE_KEY = "notsent_product_mode";
+
+export type ProductMode = "personal" | "enterprise";
+
+export function getProductMode(): ProductMode | null {
+  const val = localStorage.getItem(PRODUCT_MODE_KEY);
+  if (val === "personal" || val === "enterprise") return val;
+  return null;
+}
+
+export function setProductMode(mode: ProductMode): void {
+  localStorage.setItem(PRODUCT_MODE_KEY, mode);
+}
+
+export function clearProductMode(): void {
+  localStorage.removeItem(PRODUCT_MODE_KEY);
 }

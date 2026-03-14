@@ -1,5 +1,5 @@
 /**
- * Default home page view — select a conversation or start AI chat.
- * Re-exported so the route index can use it; actual component is WelcomeView.
+ * Default home page view — conversation list with search.
+ * Re-exported so the route index can use it.
  */
-export { WelcomeView as default } from "@/screens/Chat/WelcomeView";
+export { ConversationList as default } from "@/screens/Chat/ConversationList";

@@ -16,6 +16,12 @@ export interface ParseIMExportResult {
   messageCount: number;
   sampleMessages: ParsedMessage[];
   conversationHistory: Array<{ role: "user" | "assistant"; content: string }>;
+  /** Earliest and latest message timestamps as ISO strings. Null if no timestamps available. */
+  dateRange: { from: string; to: string } | null;
+  /** How many messages the user sent */
+  userMessageCount: number;
+  /** How many messages the partner sent */
+  partnerMessageCount: number;
 }
 
 // ---- Format detectors & parsers ----
@@ -243,6 +249,9 @@ export function parseIMExport(
       messageCount: 0,
       sampleMessages: [],
       conversationHistory: [],
+      dateRange: null,
+      userMessageCount: 0,
+      partnerMessageCount: 0,
     };
   }
 
@@ -253,6 +262,9 @@ export function parseIMExport(
       messageCount: 0,
       sampleMessages: [],
       conversationHistory: [],
+      dateRange: null,
+      userMessageCount: 0,
+      partnerMessageCount: 0,
     };
   }
 
@@ -292,10 +304,29 @@ export function parseIMExport(
       content: m.text,
     }));
 
+  // Compute date range from timestamps (ISO strings)
+  const timestamps = parsedMessages
+    .map((m) => m.timestamp)
+    .filter((t): t is number => t != null);
+
+  const dateRange =
+    timestamps.length >= 2
+      ? {
+          from: new Date(Math.min(...timestamps)).toISOString(),
+          to: new Date(Math.max(...timestamps)).toISOString(),
+        }
+      : null;
+
+  const partnerMessages = parsedMessages.filter((m) => m.fromPartner);
+  const userMessages = parsedMessages.filter((m) => !m.fromPartner);
+
   return {
     partnerName: partnerSender,
     messageCount: parsedMessages.length,
     sampleMessages,
     conversationHistory,
+    dateRange,
+    userMessageCount: userMessages.length,
+    partnerMessageCount: partnerMessages.length,
   };
 }

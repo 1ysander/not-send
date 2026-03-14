@@ -3,10 +3,12 @@ import {
   getMoodLog,
   logMood,
   getTodayEntry,
-  getFlaggedContacts,
-  getContactAIChatHistory,
+  getSessions,
+  getNoContactSince,
+  setNoContactSince,
 } from "@/lib/storage";
 import { PageLayout } from "@/components/PageLayout";
+import { MessageCircle, Shield } from "lucide-react";
 import type { MoodEntry } from "@/types";
 
 // ─── Color helpers ────────────────────────────────────────────────────────────
@@ -45,7 +47,7 @@ function buildCalendarDays(): string[] {
   return days;
 }
 
-function MoodCalendar({ log }: { log: MoodEntry[] }) {
+function MoodCalendar({ log, highlightToday }: { log: MoodEntry[]; highlightToday?: boolean }) {
   const days = buildCalendarDays();
   const byDate = Object.fromEntries(log.map((e) => [e.date, e]));
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -53,6 +55,16 @@ function MoodCalendar({ log }: { log: MoodEntry[] }) {
 
   return (
     <div>
+      <style>{`
+        @keyframes pulse-today {
+          0%   { transform: scale(1); box-shadow: 0 0 0 0px currentColor; }
+          40%  { transform: scale(1.35); box-shadow: 0 0 0 4px currentColor; }
+          70%  { transform: scale(1.15); }
+          100% { transform: scale(1); box-shadow: 0 0 0 0px currentColor; }
+        }
+        .today-pulse { animation: pulse-today 0.55s ease-out; }
+      `}</style>
+
       <div className="grid grid-cols-7 mb-1">
         {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
           <span key={i} className="text-center text-[10px] text-muted-foreground font-medium">
@@ -77,12 +89,13 @@ function MoodCalendar({ log }: { log: MoodEntry[] }) {
             <div
               key={date}
               title={tooltip}
-              className="aspect-square rounded-sm transition-opacity"
+              className={`aspect-square rounded-sm transition-opacity${isToday && highlightToday ? " today-pulse" : ""}`}
               style={{
                 backgroundColor: score != null ? scoreColor(score) : "hsl(var(--secondary))",
                 opacity: score != null ? 1 : 0.45,
                 outline: isToday ? "2px solid hsl(var(--foreground))" : "none",
                 outlineOffset: "1px",
+                color: score != null ? scoreColor(score) : "transparent",
               }}
             />
           );
@@ -144,23 +157,46 @@ const LABELS: Record<number, string> = {
   10: "Thriving",
 };
 
-const MAX_WORDS = 50;
+const MAX_NOTE_WORDS = 50;
 
-function getTotalMessagesSent(): number {
-  const contacts = getFlaggedContacts();
-  let total = 0;
-  for (const contact of contacts) {
-    total += getContactAIChatHistory(contact.id).filter((m) => m.role === "user").length;
-  }
-  return total;
+function getTotalMessagesIntercepted(): number {
+  return getSessions().length;
+}
+
+/** Returns the number of full days between a past ISO date string and today. */
+function daysSince(isoDateStr: string): number {
+  const start = new Date(isoDateStr);
+  start.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+}
+
+/** Format a stored date string as "Jan 12, 2024". */
+function formatNoContactDate(isoDateStr: string): string {
+  return new Date(isoDateStr).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/** Get today's date as YYYY-MM-DD for the date input default value. */
+function todayInputValue(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 export function StatsScreen() {
   const [log, setLog] = useState<MoodEntry[]>([]);
   const [todayScore, setTodayScore] = useState<number | null>(null);
   const [note, setNote] = useState("");
+  const [journal, setJournal] = useState("");
   const [justSaved, setJustSaved] = useState(false);
+  const [journalSaved, setJournalSaved] = useState(false);
+  const [journalJustSaved, setJournalJustSaved] = useState(false);
+  const [highlightToday, setHighlightToday] = useState(false);
   const [totalMessages, setTotalMessages] = useState(0);
+  const [noContactSince, setNoContactSinceState] = useState<string | null>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -169,16 +205,29 @@ export function StatsScreen() {
     const entry = getTodayEntry();
     setTodayScore(entry?.score ?? null);
     setNote(entry?.note ?? "");
-    setTotalMessages(getTotalMessagesSent());
+    setJournal(entry?.journal ?? "");
+    setJournalSaved(!!entry?.journal?.trim());
+    setTotalMessages(getTotalMessagesIntercepted());
+    setNoContactSinceState(getNoContactSince());
   }, []);
 
-  // Auto-save note 600ms after the user stops typing
+  function handleNoContactDateChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const val = e.target.value;
+    if (!val) return;
+    setNoContactSince(val);
+    setNoContactSinceState(val);
+  }
+
+  // Auto-save note only (600ms debounce); journal is submitted manually
   useEffect(() => {
     if (todayScore === null) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      logMood(todayScore, note.trim() || undefined);
+      const currentJournal = getTodayEntry()?.journal;
+      logMood(todayScore, note.trim() || undefined, currentJournal);
       setLog(getMoodLog());
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 1800);
     }, 600);
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -187,21 +236,39 @@ export function StatsScreen() {
 
   const handleSelectScore = useCallback((score: number) => {
     setTodayScore(score);
-    logMood(score, note.trim() || undefined);
+    logMood(score, note.trim() || undefined, journal.trim() || undefined);
     setLog(getMoodLog());
     setJustSaved(true);
     setTimeout(() => setJustSaved(false), 1800);
+    // Pulse the today cell in the calendar
+    setHighlightToday(false);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setHighlightToday(true));
+    });
+    setTimeout(() => setHighlightToday(false), 700);
     // Focus note field after picking a score
     setTimeout(() => noteRef.current?.focus(), 80);
-  }, [note]);
+  }, [note, journal]);
 
   const handleNoteChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
-    // Block input past 50 words but allow editing within them
-    if (wordCount(val) <= MAX_WORDS) {
+    if (wordCount(val) <= MAX_NOTE_WORDS) {
       setNote(val);
     }
   }, []);
+
+  const handleJournalChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setJournal(e.target.value);
+  }, []);
+
+  const handleSubmitJournal = useCallback(() => {
+    if (todayScore === null || !journal.trim()) return;
+    logMood(todayScore, note.trim() || undefined, journal.trim());
+    setLog(getMoodLog());
+    setJournalSaved(true);
+    setJournalJustSaved(true);
+    setTimeout(() => setJournalJustSaved(false), 2000);
+  }, [todayScore, journal, note]);
 
   const streak = (() => {
     let count = 0;
@@ -215,8 +282,8 @@ export function StatsScreen() {
     return count;
   })();
 
-  const words = wordCount(note);
-  const wordsLeft = MAX_WORDS - words;
+  const noteWords = wordCount(note);
+  const noteWordsLeft = MAX_NOTE_WORDS - noteWords;
 
   return (
     <PageLayout title="How you're doing">
@@ -224,10 +291,57 @@ export function StatsScreen() {
         Check in once a day. Watch your healing.
       </p>
 
+      {/* No-contact counter */}
+      <div className="rounded-2xl bg-[#111] border border-border p-5 space-y-3 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Shield className="h-4 w-4 text-[#bf5af2]" />
+            <p className="text-[13px] font-semibold text-foreground uppercase tracking-wide">No contact</p>
+          </div>
+          {noContactSince && (
+            <p className="text-[11px] text-muted-foreground">
+              since {formatNoContactDate(noContactSince)}
+            </p>
+          )}
+        </div>
+
+        {noContactSince ? (
+          <div className="flex items-end gap-2">
+            <span className="text-[52px] font-bold text-[#bf5af2] tabular-nums leading-none">
+              {daysSince(noContactSince)}
+            </span>
+            <span className="text-[15px] text-muted-foreground pb-1.5">days</span>
+          </div>
+        ) : (
+          <p className="text-[14px] text-muted-foreground">
+            Set your start date to track how long you've stayed no contact.
+          </p>
+        )}
+
+        <div className="flex items-center gap-2">
+          <label className="text-[12px] text-muted-foreground shrink-0">
+            {noContactSince ? "Change date:" : "No contact since:"}
+          </label>
+          <input
+            type="date"
+            max={todayInputValue()}
+            defaultValue={noContactSince ?? todayInputValue()}
+            onChange={handleNoContactDateChange}
+            className="flex-1 min-w-0 h-9 rounded-lg bg-secondary border border-border px-3 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-[#bf5af2]/40 transition-shadow"
+          />
+        </div>
+      </div>
+
       {/* Message count */}
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm flex items-center justify-between">
-        <p className="text-[14px] font-semibold text-foreground">Messages sent</p>
-        <span className="text-[22px] font-bold text-foreground tabular-nums">{totalMessages}</span>
+      <div className="rounded-2xl bg-brand-gradient p-5 flex items-center justify-between shadow-sm">
+        <div>
+          <p className="text-[12px] font-medium text-white/70 uppercase tracking-wider">Messages intercepted</p>
+          <span className="text-[32px] font-bold text-white tabular-nums leading-none mt-1 block">{totalMessages}</span>
+          <p className="text-[11px] text-white/60 mt-1">drafts you held back</p>
+        </div>
+        <div className="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center">
+          <MessageCircle className="h-6 w-6 text-white" />
+        </div>
       </div>
 
       {/* Daily check-in */}
@@ -251,37 +365,70 @@ export function StatsScreen() {
 
         <ScorePicker current={todayScore} onSelect={handleSelectScore} />
 
-        {/* Note field — appears once a score is picked */}
+        {/* Note + journal fields — appear once a score is picked */}
         {todayScore != null && (
-          <div className="space-y-1.5">
-            <textarea
-              ref={noteRef}
-              value={note}
-              onChange={handleNoteChange}
-              placeholder="Describe how you're feeling… (optional)"
-              rows={3}
-              className="w-full resize-none rounded-xl border border-border bg-background px-3.5 py-2.5 text-[14px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/40 transition-shadow"
-            />
-            <div className="flex items-center justify-between px-0.5">
-              <p
-                className="text-[11px] transition-opacity duration-500"
-                style={{
-                  opacity: justSaved ? 1 : 0,
-                  color: "hsl(var(--muted-foreground))",
-                }}
-              >
-                Saved
+          <div className="space-y-3">
+            {/* Short caption (50 words) */}
+            <div className="space-y-1.5">
+              <textarea
+                ref={noteRef}
+                value={note}
+                onChange={handleNoteChange}
+                placeholder="One-line caption… (optional, 50 words)"
+                rows={2}
+                className="w-full resize-none rounded-xl border border-border bg-background px-3.5 py-2.5 text-[14px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/40 transition-shadow"
+              />
+              <div className="flex items-center justify-between px-0.5">
+                <p
+                  className="text-[11px] transition-opacity duration-500"
+                  style={{
+                    opacity: justSaved ? 1 : 0,
+                    color: "hsl(var(--muted-foreground))",
+                  }}
+                >
+                  Saved
+                </p>
+                <p
+                  className="text-[11px] tabular-nums"
+                  style={{
+                    color: noteWordsLeft <= 5
+                      ? scoreColor(2)
+                      : "hsl(var(--muted-foreground))",
+                  }}
+                >
+                  {noteWordsLeft} word{noteWordsLeft !== 1 ? "s" : ""} left
+                </p>
+              </div>
+            </div>
+
+            {/* Journal entry (unlimited) */}
+            <div className="space-y-1.5">
+              <p className="text-[12px] font-medium text-muted-foreground px-0.5">
+                Journal entry
               </p>
-              <p
-                className="text-[11px] tabular-nums"
-                style={{
-                  color: wordsLeft <= 5
-                    ? scoreColor(2)
-                    : "hsl(var(--muted-foreground))",
-                }}
-              >
-                {wordsLeft} word{wordsLeft !== 1 ? "s" : ""} left
-              </p>
+              <textarea
+                value={journal}
+                onChange={handleJournalChange}
+                placeholder="Write as much as you need. No one else sees this."
+                rows={6}
+                className="w-full resize-none rounded-xl border border-border bg-background px-3.5 py-2.5 text-[14px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/40 transition-shadow"
+              />
+              <div className="flex items-center justify-between px-0.5">
+                <p
+                  className="text-[11px] transition-opacity duration-500"
+                  style={{ opacity: journalJustSaved ? 1 : 0, color: "hsl(var(--muted-foreground))" }}
+                >
+                  Journal saved
+                </p>
+                <button
+                  type="button"
+                  disabled={!journal.trim()}
+                  onClick={handleSubmitJournal}
+                  className="text-[13px] font-semibold px-4 py-1.5 rounded-lg bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity active:scale-95"
+                >
+                  {journalSaved ? "Edit entry" : "Write today's entry"}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -303,7 +450,7 @@ export function StatsScreen() {
             </span>
           )}
         </div>
-        <MoodCalendar log={log} />
+        <MoodCalendar log={log} highlightToday={highlightToday} />
       </div>
     </PageLayout>
   );

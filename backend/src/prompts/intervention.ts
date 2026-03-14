@@ -17,40 +17,51 @@ export function buildInterventionSystemPrompt(
 
   const partnerName = userContext?.partnerName ?? partnerContext?.partnerName ?? "their ex";
 
-  let contextBlock = `Context: The user was about to send: "${messageAttempted}"`;
-  contextBlock += `\nTheir ex's name is ${partnerName}.`;
+  let contextBlock = `The user was about to send this message to ${partnerName}: "${messageAttempted}"`;
 
   if (userContext?.breakupSummary?.trim()) {
-    contextBlock += `\nAbout the breakup: ${userContext.breakupSummary.trim()}`;
+    contextBlock += `\nWhat they've shared about the breakup: ${userContext.breakupSummary.trim()}`;
   }
 
-  // Inject relationship memory so AI can reference real dynamics
+  if (userContext?.noContactDays != null && userContext.noContactDays > 0) {
+    contextBlock += `\nThey've been no-contact for ${userContext.noContactDays} day${userContext.noContactDays === 1 ? "" : "s"}.`;
+  }
+
+  // Inject relationship memory so AI can reference real dynamics from the actual conversation
   const mem = partnerContext?.relationshipMemory;
   if (mem) {
     const insights: string[] = [];
+    const totalMsgs = mem.partnerMessageCount + mem.userMessageCount;
 
-    if (mem.recurringTopics.length > 0) {
-      insights.push(`Topics that came up a lot in their conversations: ${mem.recurringTopics.join(", ")}`);
+    if (totalMsgs > 0) {
+      const depth = totalMsgs > 1000 ? "a long, deep" : totalMsgs > 300 ? "a substantial" : "a meaningful";
+      insights.push(`This was ${depth} text relationship — ${totalMsgs} messages exchanged`);
     }
+
     if (mem.partnerTone !== "casual") {
       const toneDesc: Record<string, string> = {
-        warm: `${partnerName} communicated warmly and affectionately`,
-        playful: `${partnerName} was playful and light in their communication style`,
-        distant: `${partnerName} was often measured or distant in their replies`,
-        anxious: `${partnerName} showed signs of anxiety or emotional urgency in messages`,
+        warm: `${partnerName} was genuinely warm and affectionate in their messages — this was not a cold relationship`,
+        playful: `${partnerName} was playful and light in their texts — lots of humor and banter`,
+        distant: `${partnerName} was often guarded or slow to respond — there was probably some emotional imbalance`,
+        anxious: `${partnerName} could be emotionally intense or over-eager at times`,
       };
       if (toneDesc[mem.partnerTone]) insights.push(toneDesc[mem.partnerTone]);
     }
-    if (mem.endearments.length > 0) {
-      insights.push(`${partnerName} used endearments like: ${mem.endearments.slice(0, 3).join(", ")}`);
+
+    if (mem.recurringTopics.length > 0) {
+      insights.push(`The things they talked about most: ${mem.recurringTopics.slice(0, 4).join(", ")}`);
     }
-    const totalMsgs = mem.partnerMessageCount + mem.userMessageCount;
-    if (totalMsgs > 0) {
-      insights.push(`This relationship had ${totalMsgs} messages of conversation history`);
+
+    if (mem.endearments.length > 0) {
+      insights.push(`${partnerName} used to call them: "${mem.endearments.slice(0, 2).join('", "')}"`);
+    }
+
+    if (mem.responseDelayProfile === "slow" || mem.readsWithoutReplying) {
+      insights.push(`${partnerName} often left messages on read or took a long time to reply`);
     }
 
     if (insights.length > 0) {
-      contextBlock += `\n\nRelationship context (from their uploaded conversation):\n` +
+      contextBlock += `\n\nWhat you know about this relationship (from their uploaded conversation):\n` +
         insights.map((i) => `- ${i}`).join("\n");
     }
   }
@@ -59,15 +70,21 @@ export function buildInterventionSystemPrompt(
   if (conversationHistory.length > 0) {
     const recent = conversationHistory.slice(-maxHistoryTurns);
     historyBlock =
-      "\n\nPrior NOTSENT turns (use for continuity; don't repeat yourself):\n" +
+      "\n\nWhat's been said in this session so far (don't repeat yourself):\n" +
       recent
-        .map((t) => `${t.role === "user" ? "User" : "NOTSENT"}: ${t.content.slice(0, 400)}${t.content.length > 400 ? "…" : ""}`)
+        .map((t) => `${t.role === "user" ? "Them" : "You"}: ${t.content.slice(0, 400)}${t.content.length > 400 ? "…" : ""}`)
         .join("\n");
   }
 
-  return `You are a calm, non-judgmental AI that intercepts messages people are about to send their ex. Your job is not to lecture — it's to help them process the impulse in real time.
+  return `You are the one friend who actually gets it — not a therapist, not a wellness app. You've read their messages. You know ${partnerName}. You know what this relationship was.
 
-Start by acknowledging what they were going to say. Then gently help them consider: what outcome they're hoping for, whether sending it would move them toward that, and what they actually need right now that isn't their ex. Never tell them what to do; ask questions. Be warm and brief. If after the conversation they still want to send something, help them write a version they won't regret.
+Your job right now: intercept this impulse before it goes anywhere. Not by lecturing. Not by telling them what to do. By actually talking to them.
+
+Start by acknowledging the message they wanted to send — reflect it back to them so they feel heard. Then gently explore: what are they hoping happens if they send it? Is that realistic? What are they actually missing right now — ${partnerName} specifically, or something else? Ask one question at a time. Be warm. Be honest. Keep your responses short — this is a conversation, not a speech.
+
+If they work through it and still want to send something, help them write a version that won't make things worse.
+
+Never moralize. Never say "you deserve better" unprompted. Never tell them their feelings are wrong. Your job is to help them get clear, not to talk them out of their own experience.
 
 ${contextBlock}${historyBlock}`;
 }

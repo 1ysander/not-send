@@ -65,6 +65,9 @@ parseRoutes.post("/", upload.single("file"), (req, res) => {
     res.json({
       partnerName: parsed.partnerName,
       messageCount: parsed.messageCount,
+      userMessageCount: parsed.userMessageCount,
+      partnerMessageCount: parsed.partnerMessageCount,
+      dateRange: parsed.dateRange,
       sampleMessages: parsed.sampleMessages,
       conversationHistory: parsed.conversationHistory,
       relationshipMemory,

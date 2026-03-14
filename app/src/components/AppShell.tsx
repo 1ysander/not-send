@@ -1,8 +1,9 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { MessageCircle, Users, BarChart3, Settings, Plus } from "lucide-react";
+import { MessageCircle, Users, BarChart3, Settings, Plus, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Layout } from "@/components/layout/Layout";
 import { Sidebar } from "@/components/ui/Sidebar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { ContactAvatar } from "@/components/ContactAvatar";
 import { getFlaggedContacts, getSessionsForContact } from "@/lib/storage";
 import { useConversationSocketOptional } from "@/contexts/ConversationSocketContext";
@@ -10,6 +11,7 @@ import { useConversationSocketOptional } from "@/contexts/ConversationSocketCont
 const navItems = [
   { path: "/", end: true, label: "Chats", icon: MessageCircle },
   { path: "/contacts", end: false, label: "Contacts", icon: Users },
+  { path: "/ai-chat", end: false, label: "AI Chat", icon: Bot },
   { path: "/stats", end: false, label: "Stats", icon: BarChart3 },
   { path: "/settings", end: false, label: "Settings", icon: Settings },
 ] as const;
@@ -39,7 +41,7 @@ export function AppShell() {
   const sidebar = (
     <Sidebar>
       <div className="flex h-14 flex-shrink-0 items-center px-4 border-b border-border">
-        <span className="text-[15px] font-semibold tracking-tight text-foreground">
+        <span className="text-[15px] font-bold tracking-tight text-brand-gradient">
           NOTSENT
         </span>
       </div>
@@ -52,12 +54,15 @@ export function AppShell() {
               type="button"
               onClick={() => navigate(path)}
               className={cn(
-                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[14px] transition-colors",
+                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[14px] transition-colors relative",
                 active
-                  ? "bg-primary text-primary-foreground font-medium"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  ? "bg-secondary text-foreground font-medium"
+                  : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
               )}
             >
+              {active && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-0.5 rounded-full bg-foreground" />
+              )}
               <Icon className="h-[18px] w-[18px] flex-shrink-0" />
               {label}
             </button>
@@ -69,14 +74,14 @@ export function AppShell() {
           <button
             type="button"
             onClick={() => navigate("/contacts")}
-            className="flex flex-1 items-center gap-2 rounded-lg bg-primary text-primary-foreground px-3 py-2 text-[13px] font-medium hover:opacity-90"
+            className="flex flex-1 items-center gap-2 rounded-lg border border-border bg-secondary px-3 py-2 text-[13px] font-medium text-foreground hover:bg-secondary/80 transition-colors"
             aria-label="Add contact"
           >
             <Plus className="h-4 w-4" strokeWidth={2} />
             New chat
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <ScrollArea className="flex-1">
           {contacts.length === 0 ? (
             <div className="px-3 py-6 text-center">
               <p className="text-[13px] text-muted-foreground">No conversations yet</p>
@@ -127,7 +132,7 @@ export function AppShell() {
               })}
             </ul>
           )}
-        </div>
+        </ScrollArea>
       </div>
     </Sidebar>
   );
@@ -145,7 +150,7 @@ export function AppShell() {
       {/* Mobile bottom nav */}
       <nav
         className={cn(
-          "flex md:hidden flex-shrink-0 items-end justify-around border-t border-border bg-background px-1 pt-2 pb-safe"
+          "flex md:hidden flex-shrink-0 items-end justify-around border-t border-border bg-background/95 backdrop-blur-sm px-1 pt-2 pb-safe"
         )}
         role="tablist"
         aria-label="Main navigation"
@@ -159,21 +164,19 @@ export function AppShell() {
               role="tab"
               aria-current={active ? "page" : undefined}
               onClick={() => navigate(path)}
-              className="flex flex-col items-center gap-1 min-w-[48px] py-2 px-2"
+              className="flex flex-col items-center gap-0.5 min-w-[52px] py-2 px-2 relative"
             >
+              {active && (
+                <span className="absolute top-1 left-1/2 -translate-x-1/2 h-0.5 w-5 rounded-full bg-foreground" />
+              )}
               <Icon
                 className={cn(
-                  "h-6 w-6",
+                  "h-6 w-6 mt-1",
                   active ? "text-foreground" : "text-muted-foreground"
                 )}
                 strokeWidth={active ? 2.2 : 1.7}
               />
-              <span
-                className={cn(
-                  "text-[10px] leading-none",
-                  active ? "text-foreground font-medium" : "text-muted-foreground"
-                )}
-              >
+              <span className={cn("text-[10px] leading-none", active ? "text-foreground font-medium" : "text-muted-foreground")}>
                 {label}
               </span>
             </button>

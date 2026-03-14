@@ -129,6 +129,11 @@ chatRoutes.post("/support", async (req, res) => {
   res.end();
 });
 
+/** Enterprise compliance scanning stub — not yet implemented. */
+chatRoutes.post("/compliance", (_req, res) => {
+  res.status(501).json({ error: "Enterprise compliance not yet available." });
+});
+
 /** Contact chat: AI fully adopts the contact's texting style (learned from uploaded conversation). */
 chatRoutes.post("/contact", async (req, res) => {
   const { messages, partnerContext: bodyPartnerContext, userContext: bodyUserContext, deviceId } = req.body ?? {};

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, Trash2, Heart } from "lucide-react";
+import { ChevronLeft, Trash2, Heart, ShieldAlert } from "lucide-react";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { InputBar } from "@/components/chat/InputBar";
 import { MessageBubble } from "@/components/chat/MessageBubble";
@@ -294,6 +294,24 @@ export function ChatScreen() {
         <div ref={endRef} />
       </ChatWindow>
 
+      {/* Intercept strip — visible when user has typed something */}
+      {input.trim().length > 0 && !loading && (
+        <div className="flex-shrink-0 border-t border-border/60 bg-background/95 px-4 pt-2 pb-1">
+          <button
+            type="button"
+            onClick={() => {
+              const draft = input.trim();
+              if (!draft) return;
+              setInput("");
+              navigate("/intervention", { state: { messageAttempted: draft, contactId } });
+            }}
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#bf5af2]/10 border border-[#bf5af2]/25 py-2.5 text-[13px] font-medium text-[#bf5af2] hover:bg-[#bf5af2]/15 transition-colors active:scale-95"
+          >
+            <ShieldAlert className="h-3.5 w-3.5" />
+            Intercept this message before sending
+          </button>
+        </div>
+      )}
       <InputBar
         value={input}
         onChange={setInput}

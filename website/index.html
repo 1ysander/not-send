@@ -3,144 +3,724 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NOTSENT — Stop yourself from texting your ex.</title>
+  <meta name="description" content="NOTSENT intercepts the impulse before it becomes a mistake. AI that knows them — because it read your messages." />
+  <title>NOTSENT — You have a message drafted. Don't send it.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <style>
+    /* ─── Design Tokens ─────────────────────────────────────────── */
     :root {
-      --bg: #0a0a0a;
-      --surface: #141414;
-      --accent: #8B5CF6;
-      --accent-hover: #7c3aed;
-      --text: #fafafa;
-      --text-muted: #a1a1aa;
+      --color-bg:           #0a0a0a;
+      --color-card:         #111111;
+      --color-card-hover:   #161616;
+      --color-border:       rgba(255, 255, 255, 0.07);
+      --color-brand:        #bf5af2;
+      --color-brand-dim:    rgba(191, 90, 242, 0.12);
+      --color-brand-glow:   rgba(191, 90, 242, 0.08);
+      --color-foreground:   #f0f0f0;
+      --color-muted:        #5a5a5a;
+      --color-muted-mid:    #8a8a8a;
+
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 20px;
+
+      --max-w: 800px;
+      --side-pad: 1.5rem;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ─── Reset ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      scroll-behavior: smooth;
+      font-size: 16px;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      min-height: 100vh;
+      font-family: var(--font);
+      background: var(--color-bg);
+      color: var(--color-foreground);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
-    .container { max-width: 720px; margin: 0 auto; padding: 0 1.5rem; }
-    section { padding: 4rem 0; }
-    h1 {
-      font-size: clamp(2rem, 5vw, 2.75rem);
+
+    /* ─── Layout helpers ─────────────────────────────────────────── */
+    .container {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 var(--side-pad);
+    }
+
+    /* ─── Animations ─────────────────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(28px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.6; }
+      50%       { opacity: 1; }
+    }
+
+    .animate {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+
+    .animate.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .animate-delay-1 { transition-delay: 0.1s; }
+    .animate-delay-2 { transition-delay: 0.2s; }
+    .animate-delay-3 { transition-delay: 0.3s; }
+    .animate-delay-4 { transition-delay: 0.45s; }
+
+    /* ─── Nav ────────────────────────────────────────────────────── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 1.1rem var(--side-pad);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(10, 10, 10, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .nav-wordmark {
+      font-size: 0.9375rem;
       font-weight: 700;
-      letter-spacing: -0.02em;
+      letter-spacing: 0.12em;
+      color: var(--color-foreground);
+      text-decoration: none;
+      text-transform: uppercase;
+    }
+
+    .nav-cta {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--color-brand);
+      text-decoration: none;
+      letter-spacing: 0.02em;
+      padding: 0.45rem 1rem;
+      border: 1px solid rgba(191, 90, 242, 0.35);
+      border-radius: var(--radius-sm);
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .nav-cta:hover {
+      background: var(--color-brand-dim);
+      border-color: rgba(191, 90, 242, 0.6);
+    }
+
+    /* ─── Hero ───────────────────────────────────────────────────── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      padding-top: 5rem;
+    }
+
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .hero-bg::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -55%);
+      width: 70vw;
+      height: 70vw;
+      max-width: 640px;
+      max-height: 640px;
+      background: radial-gradient(circle, rgba(191, 90, 242, 0.07) 0%, transparent 70%);
+      animation: pulseGlow 6s ease-in-out infinite;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 2rem var(--side-pad);
+    }
+
+    .hero-label {
+      display: inline-block;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--color-brand);
+      margin-bottom: 1.75rem;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 0.1s forwards;
+    }
+
+    .hero-headline {
+      font-size: clamp(2.25rem, 6vw, 4rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.12;
+      color: var(--color-foreground);
+      max-width: 680px;
+      margin: 0 auto 1.5rem;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 0.25s forwards;
+    }
+
+    .hero-sub {
+      font-size: clamp(1rem, 2.5vw, 1.1875rem);
+      color: var(--color-muted-mid);
+      max-width: 480px;
+      margin: 0 auto 2.5rem;
+      line-height: 1.7;
+      font-weight: 400;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 0.4s forwards;
+    }
+
+    .hero-sub em {
+      color: var(--color-foreground);
+      font-style: normal;
+    }
+
+    .btn-primary {
+      display: inline-block;
+      background: var(--color-brand);
+      color: #fff;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      padding: 0.85rem 2rem;
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 0.55s forwards;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.88;
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    /* ─── Section shared ─────────────────────────────────────────── */
+    section:not(.hero) {
+      padding: 5rem 0;
+      border-top: 1px solid var(--color-border);
+    }
+
+    .section-label {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--color-brand);
       margin-bottom: 1rem;
     }
-    h2 {
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      margin-bottom: 2rem;
+
+    .section-headline {
+      font-size: clamp(1.625rem, 4vw, 2.5rem);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.2;
+      color: var(--color-foreground);
+      margin-bottom: 1rem;
     }
-    .hero .subhead {
-      font-size: 1.125rem;
-      color: var(--text-muted);
-      max-width: 36ch;
+
+    .section-sub {
+      font-size: 1rem;
+      color: var(--color-muted-mid);
+      max-width: 52ch;
+      line-height: 1.7;
     }
-    .how-it-works ol {
-      list-style: none;
-      counter-reset: step;
+
+    /* ─── How it works ───────────────────────────────────────────── */
+    .steps {
+      margin-top: 3.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
     }
-    .how-it-works li {
-      counter-increment: step;
-      padding: 1.25rem 0;
-      border-bottom: 1px solid var(--surface);
-      padding-left: 3rem;
-      position: relative;
+
+    .step {
+      display: grid;
+      grid-template-columns: 3rem 1fr;
+      gap: 0 1.5rem;
+      padding: 2rem 0;
+      border-bottom: 1px solid var(--color-border);
     }
-    .how-it-works li:last-child { border-bottom: none; }
-    .how-it-works li::before {
-      content: counter(step);
-      position: absolute;
-      left: 0;
-      width: 1.75rem;
-      height: 1.75rem;
-      background: var(--accent);
-      color: var(--bg);
+
+    .step:last-child { border-bottom: none; }
+
+    .step-number {
+      display: flex;
+      align-items: flex-start;
+      padding-top: 0.15rem;
+    }
+
+    .step-badge {
+      width: 2.125rem;
+      height: 2.125rem;
+      background: var(--color-brand-dim);
+      border: 1px solid rgba(191, 90, 242, 0.25);
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
+      font-size: 0.8125rem;
       font-weight: 700;
-      font-size: 0.875rem;
+      color: var(--color-brand);
+      flex-shrink: 0;
     }
-    .cta {
-      display: inline-block;
-      background: var(--accent);
-      color: white;
-      padding: 0.75rem 1.5rem;
-      border-radius: 8px;
-      text-decoration: none;
+
+    .step-body {}
+
+    .step-title {
+      font-size: 1.1875rem;
       font-weight: 600;
-      margin-top: 1.5rem;
-      transition: background 0.2s;
+      color: var(--color-foreground);
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.01em;
     }
-    .cta:hover { background: var(--accent-hover); }
-    .for-funders {
-      background: var(--surface);
-      border-radius: 12px;
-      padding: 2rem;
-      margin-top: 1rem;
-    }
-    .for-funders h3 { font-size: 1rem; margin-bottom: 1rem; }
-    .for-funders ul { margin-left: 1.25rem; color: var(--text-muted); }
-    .for-funders li { margin-bottom: 0.5rem; }
-    .for-funders a { color: var(--accent); text-decoration: none; }
-    .for-funders a:hover { text-decoration: underline; }
-    footer {
-      padding: 3rem 0;
-      border-top: 1px solid var(--surface);
-      text-align: center;
-      color: var(--text-muted);
+
+    .step-desc {
       font-size: 0.9375rem;
+      color: var(--color-muted-mid);
+      line-height: 1.7;
+      max-width: 52ch;
     }
-    footer a { color: var(--accent); text-decoration: none; }
-    footer a:hover { text-decoration: underline; }
+
+    /* ─── For who ────────────────────────────────────────────────── */
+    .scenario-cards {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      margin-top: 3rem;
+    }
+
+    @media (min-width: 580px) {
+      .scenario-cards {
+        grid-template-columns: 1fr 1fr;
+      }
+      .scenario-cards .card:last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+      }
+    }
+
+    .card {
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 1.75rem;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .card:hover {
+      background: var(--color-card-hover);
+      border-color: rgba(255, 255, 255, 0.11);
+    }
+
+    .card-quote {
+      font-size: 1.125rem;
+      font-weight: 400;
+      color: var(--color-foreground);
+      line-height: 1.6;
+      letter-spacing: -0.01em;
+    }
+
+    .card-quote::before {
+      content: '"';
+      color: var(--color-brand);
+      font-size: 1.5rem;
+      line-height: 0;
+      vertical-align: -0.25rem;
+      margin-right: 0.1em;
+    }
+
+    .card-quote::after {
+      content: '"';
+      color: var(--color-brand);
+      font-size: 1.5rem;
+      line-height: 0;
+      vertical-align: -0.25rem;
+      margin-left: 0.1em;
+    }
+
+    /* ─── The AI ─────────────────────────────────────────────────── */
+    .ai-body {
+      font-size: 1.0625rem;
+      color: var(--color-muted-mid);
+      line-height: 1.8;
+      max-width: 58ch;
+      margin: 1.5rem 0 2.5rem;
+    }
+
+    .ai-body strong {
+      color: var(--color-foreground);
+      font-weight: 500;
+    }
+
+    .feature-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.625rem;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--color-foreground);
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      border-radius: 100px;
+      padding: 0.45rem 1rem;
+      letter-spacing: 0.01em;
+    }
+
+    .chip-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--color-brand);
+      flex-shrink: 0;
+    }
+
+    /* ─── Access / Waitlist ──────────────────────────────────────── */
+    #access {
+      padding: 6rem 0;
+    }
+
+    .access-inner {
+      max-width: 520px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 0.625rem;
+      margin-top: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .email-input {
+      flex: 1;
+      min-width: 0;
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      color: var(--color-foreground);
+      font-family: var(--font);
+      font-size: 0.9375rem;
+      padding: 0.8rem 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .email-input::placeholder { color: var(--color-muted); }
+
+    .email-input:focus {
+      border-color: rgba(191, 90, 242, 0.5);
+    }
+
+    .btn-submit {
+      background: var(--color-brand);
+      color: #fff;
+      font-family: var(--font);
+      font-size: 0.9375rem;
+      font-weight: 600;
+      padding: 0.8rem 1.5rem;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.2s;
+      flex-shrink: 0;
+    }
+
+    .btn-submit:hover { opacity: 0.85; }
+
+    .access-fine {
+      margin-top: 1.25rem;
+      font-size: 0.8125rem;
+      color: var(--color-muted);
+      line-height: 1.6;
+    }
+
+    .access-confirm {
+      display: none;
+      margin-top: 2rem;
+      padding: 1.25rem 1.5rem;
+      background: var(--color-brand-dim);
+      border: 1px solid rgba(191, 90, 242, 0.2);
+      border-radius: var(--radius-md);
+      font-size: 0.9375rem;
+      color: var(--color-foreground);
+      line-height: 1.6;
+    }
+
+    .access-confirm.visible { display: block; }
+
+    /* ─── Footer ─────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--color-border);
+      padding: 2.5rem 0;
+    }
+
+    .footer-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.875rem;
+      text-align: center;
+    }
+
+    .footer-wordmark {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+    }
+
+    .footer-privacy {
+      font-size: 0.8125rem;
+      color: var(--color-muted);
+      line-height: 1.6;
+      max-width: 36ch;
+    }
+
+    .footer-copy {
+      font-size: 0.75rem;
+      color: var(--color-muted);
+      opacity: 0.55;
+    }
+
+    /* ─── Divider ────────────────────────────────────────────────── */
+    .divider {
+      width: 32px;
+      height: 1px;
+      background: var(--color-border);
+      margin: 1rem 0;
+    }
+
+    /* ─── Responsive tweaks ──────────────────────────────────────── */
+    @media (min-width: 640px) {
+      .form-row { flex-wrap: nowrap; }
+    }
+
+    @media (max-width: 420px) {
+      .hero-headline { font-size: 2rem; }
+      .section-headline { font-size: 1.5rem; }
+    }
   </style>
 </head>
 <body>
-  <header class="hero section">
-    <div class="container">
-      <h1>Stop yourself from texting your ex.</h1>
-      <p class="subhead">NOTSENT intercepts the message before it sends and opens a calm AI chat so you process the impulse instead of sending.</p>
-      <a href="http://localhost:5173" class="cta" id="demo-link">Try the demo</a>
-    </div>
-  </header>
 
-  <section class="how-it-works section">
-    <div class="container">
-      <h2>How it works</h2>
-      <ol>
-        <li>Flag your ex’s number in the app so NOTSENT knows who to protect you from.</li>
-        <li>When you want to text them, open NOTSENT and type there instead.</li>
-        <li>We intercept send and open a calm AI chat so you process the impulse instead of sending.</li>
-      </ol>
+  <!-- ─── Nav ──────────────────────────────────────────────── -->
+  <nav>
+    <a class="nav-wordmark" href="/">NOTSENT</a>
+    <a class="nav-cta" href="#access">Get access</a>
+  </nav>
+
+  <!-- ─── Hero ─────────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-content">
+      <span class="hero-label">Breakup AI</span>
+      <h1 class="hero-headline">You have a message drafted.<br>Don't send it.</h1>
+      <p class="hero-sub">NOTSENT intercepts the impulse before it becomes a mistake. AI that actually knows them — <em>because it read your messages.</em></p>
+      <a href="#" class="btn-primary">Start free</a>
     </div>
   </section>
 
-  <section class="for-funders-section section">
+  <!-- ─── How it works ─────────────────────────────────────── -->
+  <section class="how-it-works">
     <div class="container">
-      <h2>For funders</h2>
-      <div class="for-funders">
-        <h3>Try the demo</h3>
-        <p><a href="http://localhost:5173" id="demo-link-2">Open the app</a> (run locally: <code>cd app && npm run dev</code>). Replace with your demo URL when deployed.</p>
-        <h3 style="margin-top: 1.5rem;">Metrics we care about</h3>
-        <ul>
-          <li>Interceptions — how often we stop a send and open the intervention</li>
-          <li>Messages never sent — total messages kept from being sent</li>
-          <li>Retention — D7 / D30 and DAU/MAU</li>
-        </ul>
+      <p class="section-label animate">How it works</p>
+      <h2 class="section-headline animate animate-delay-1">Three steps. Nothing sent.</h2>
+
+      <div class="steps">
+
+        <div class="step animate animate-delay-1">
+          <div class="step-number">
+            <div class="step-badge">1</div>
+          </div>
+          <div class="step-body">
+            <div class="step-title">Upload your conversation</div>
+            <p class="step-desc">Export your iMessage chat as a .txt file from your iPhone. The AI reads it — their words, their patterns, their rhythm. It learns them.</p>
+          </div>
+        </div>
+
+        <div class="step animate animate-delay-2">
+          <div class="step-number">
+            <div class="step-badge">2</div>
+          </div>
+          <div class="step-body">
+            <div class="step-title">Type what you want to send</div>
+            <p class="step-desc">Draft the message you've been rewriting. Say it here, where it can't go anywhere. The impulse deserves to exist — just not in their inbox.</p>
+          </div>
+        </div>
+
+        <div class="step animate animate-delay-3">
+          <div class="step-number">
+            <div class="step-badge">3</div>
+          </div>
+          <div class="step-body">
+            <div class="step-title">We intercept it</div>
+            <p class="step-desc">Real-time AI intervention. Not a journaling prompt. Not generic advice. The AI knows this relationship and works through the impulse with you. Nothing gets sent.</p>
+          </div>
+        </div>
+
       </div>
     </div>
   </section>
 
+  <!-- ─── For who ───────────────────────────────────────────── -->
+  <section class="for-who">
+    <div class="container">
+      <p class="section-label animate">For who</p>
+      <h2 class="section-headline animate animate-delay-1">You know who this is for.</h2>
+
+      <div class="scenario-cards">
+
+        <div class="card animate animate-delay-1">
+          <p class="card-quote">It's 2am and you've rewritten the message four times.</p>
+        </div>
+
+        <div class="card animate animate-delay-2">
+          <p class="card-quote">They posted something and now you have a reason.</p>
+        </div>
+
+        <div class="card animate animate-delay-3">
+          <p class="card-quote">You just want to know if they miss you too.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── The AI ────────────────────────────────────────────── -->
+  <section class="the-ai">
+    <div class="container">
+      <p class="section-label animate">The AI</p>
+      <h2 class="section-headline animate animate-delay-1">It read your messages.<br>It knows them.</h2>
+
+      <p class="ai-body animate animate-delay-2">
+        This isn't a journaling app. It isn't generic advice.<br>
+        The AI studied your actual conversation — <strong>their vocabulary, their patterns, how they responded</strong>, where they went cold, what made them warm. It knows this relationship specifically. Every intercept, every closure session, every moment of support is grounded in that real history.
+      </p>
+
+      <div class="feature-chips animate animate-delay-3">
+        <span class="chip"><span class="chip-dot"></span>Intercept mode</span>
+        <span class="chip"><span class="chip-dot"></span>Closure mode</span>
+        <span class="chip"><span class="chip-dot"></span>AI Support</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Access ────────────────────────────────────────────── -->
+  <section id="access">
+    <div class="container">
+      <div class="access-inner">
+        <p class="section-label animate">Early access</p>
+        <h2 class="section-headline animate animate-delay-1">Apply for early access.</h2>
+        <p class="section-sub animate animate-delay-2">We're letting in a small group to start. Leave your email.</p>
+
+        <form class="form-row animate animate-delay-3" id="access-form">
+          <input
+            class="email-input"
+            type="email"
+            id="email-input"
+            placeholder="your@email.com"
+            autocomplete="email"
+            required
+          />
+          <button class="btn-submit" type="submit">Join waitlist</button>
+        </form>
+
+        <div class="access-confirm" id="access-confirm">
+          You're on the list. We'll reach out when your spot opens.
+        </div>
+
+        <p class="access-fine animate animate-delay-4">No spam. No stored messages. Private by design.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Footer ────────────────────────────────────────────── -->
   <footer>
     <div class="container">
-      <p><strong>Apply for access</strong> — <a href="mailto:demo@notsent.app">demo@notsent.app</a> (placeholder)</p>
+      <div class="footer-inner">
+        <div class="footer-wordmark">NOTSENT</div>
+        <p class="footer-privacy">Private & confidential.<br>We don't store your messages.</p>
+        <div class="divider"></div>
+        <p class="footer-copy">&copy; 2026 NOTSENT</p>
+      </div>
     </div>
   </footer>
+
+  <!-- ─── Script ────────────────────────────────────────────── -->
+  <script>
+    // IntersectionObserver — fade-in on scroll
+    (function () {
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+      document.querySelectorAll('.animate').forEach(function (el) {
+        observer.observe(el);
+      });
+    })();
+
+    // Email form — prevent default, show confirmation
+    (function () {
+      var form = document.getElementById('access-form');
+      var confirm = document.getElementById('access-confirm');
+
+      if (!form || !confirm) return;
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        form.style.display = 'none';
+        confirm.classList.add('visible');
+      });
+    })();
+  </script>
 </body>
 </html>

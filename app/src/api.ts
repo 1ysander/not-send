@@ -1,4 +1,4 @@
-import type { UserContext, RelationshipMemory, PartnerContext } from "./types";
+import type { UserContext, RelationshipMemory, PartnerContext, ConversationDateRange } from "./types";
 
 export type { UserContext, RelationshipMemory, PartnerContext };
 
@@ -217,6 +217,12 @@ export interface ParsedConversation {
   sampleMessages: Array<{ fromPartner: boolean; text: string }>;
   conversationHistory: Array<{ role: "user" | "assistant"; content: string }>;
   relationshipMemory: RelationshipMemory;
+  /** ISO date range of the parsed conversation, null if no timestamps found. */
+  dateRange: ConversationDateRange | null;
+  /** Number of messages sent by the user in the exported chat. */
+  userMessageCount: number;
+  /** Number of messages sent by the partner in the exported chat. */
+  partnerMessageCount: number;
 }
 
 export async function uploadConversationFile(

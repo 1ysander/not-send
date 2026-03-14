@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus, MessageCircle, Bot } from "lucide-react";
 import { getFlaggedContacts, getSessionsForContact } from "@/lib/storage";
 import { ContactAvatar } from "@/components/ContactAvatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 function formatTime(ts: number): string {
   const now = Date.now();
@@ -26,8 +27,8 @@ export function WelcomeView() {
     return (
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
         <div className="max-w-sm space-y-8">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-            <MessageCircle className="h-8 w-8 text-primary" />
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-gradient">
+            <MessageCircle className="h-8 w-8 text-white" />
           </div>
           <div className="space-y-2">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
@@ -93,7 +94,7 @@ export function WelcomeView() {
       </div>
 
       {/* Conversation list */}
-      <ul className="overflow-y-auto divide-y divide-border/50">
+      <ScrollArea className="flex-1"><ul className="divide-y divide-border/50">
         {rows.map(({ contact, last }) => {
           const preview = last?.messageAttempted?.slice(0, 50) ?? "Tap to start";
           return (
@@ -121,7 +122,7 @@ export function WelcomeView() {
             </li>
           );
         })}
-      </ul>
+      </ul></ScrollArea>
 
       {/* AI Support chat shortcut */}
       <div className="flex-shrink-0 px-4 py-3 border-t border-border">

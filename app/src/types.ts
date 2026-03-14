@@ -80,11 +80,18 @@ export interface ContactProfile {
   lastUpdated?: number;
 }
 
+/** Date range from a parsed conversation export. */
+export interface ConversationDateRange {
+  from: string; // ISO date string
+  to: string;   // ISO date string
+}
+
 /** One daily mood check-in entry. */
 export interface MoodEntry {
-  date: string;   // YYYY-MM-DD
-  score: number;  // 1–10
-  note?: string;  // optional free-text, max 50 words
+  date: string;     // YYYY-MM-DD
+  score: number;    // 1–10
+  note?: string;    // optional short caption, max 50 words
+  journal?: string; // optional long-form journal entry, no limit
 }
 
 /** A single message in an AI chat thread. */

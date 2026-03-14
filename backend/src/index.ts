@@ -16,10 +16,18 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT ?? 3001;
 
-// Allow any localhost/127.0.0.1 origin in dev (Vite picks a free port each run)
-function isAllowedOrigin(origin: string | undefined): boolean {
-  if (!origin) return true;
-  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+// Allow localhost in dev + any configured ALLOWED_ORIGIN in production.
+// cors middleware requires the callback form: (origin, cb) => cb(null, allowed)
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN; // e.g. https://breakupfix.vercel.app
+
+function isAllowedOrigin(
+  origin: string | undefined,
+  callback: (err: Error | null, allow: boolean) => void
+): void {
+  if (!origin) { callback(null, true); return; }
+  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  const isProduction = ALLOWED_ORIGIN ? origin === ALLOWED_ORIGIN || origin.endsWith(".vercel.app") : false;
+  callback(null, isLocalhost || isProduction);
 }
 
 const io = new SocketServer(server, {
@@ -38,7 +46,7 @@ app.use(
 // Rate limit: 20 req/min per IP (simple in-memory)
 const rateLimit = new Map<string, { count: number; resetAt: number }>();
 const RATE_WINDOW_MS = 60_000;
-const RATE_MAX = 20;
+const RATE_MAX = 200;
 
 function rateLimitMiddleware(
   req: express.Request,
@@ -82,6 +90,6 @@ app.use("/api/engine", engineRoutes);
 app.use("/api/parse-imessage", parseRoutes);
 app.use("/api/persona", personaRoutes);
 
-server.listen(PORT, () => {
+server.listen(Number(PORT), "0.0.0.0", () => {
   console.log(`NOTSENT backend running at http://localhost:${PORT}`);
 });

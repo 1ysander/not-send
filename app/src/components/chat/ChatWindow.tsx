@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ChatWindowProps {
   children: ReactNode;
@@ -7,19 +8,16 @@ interface ChatWindowProps {
 }
 
 /**
- * Scrollable message area for the main chat column. Use with MessageBubble list.
+ * Scrollable message area for the main chat column. Uses shadcn ScrollArea.
  */
 export function ChatWindow({ children, className }: ChatWindowProps) {
   return (
-    <div
-      className={cn(
-        "flex-1 overflow-y-auto px-4 py-6",
-        className
-      )}
+    <ScrollArea
+      className={cn("flex-1", className)}
     >
-      <div className="mx-auto max-w-xl space-y-6">
+      <div className="px-4 py-6 mx-auto max-w-xl space-y-2">
         {children}
       </div>
-    </div>
+    </ScrollArea>
   );
 }

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getFlaggedContacts, getSessionsForContact } from "@/lib/storage";
 import { useConversationSocketOptional } from "@/contexts/ConversationSocketContext";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { ContactAvatar } from "@/components/ContactAvatar";
 import { MessageCircle, Search, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -62,7 +63,7 @@ export function ConversationList() {
               placeholder="Search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-10 pl-9 pr-4 rounded-xl bg-secondary text-[15px] text-foreground placeholder:text-muted-foreground border-0 outline-none focus:ring-2 focus:ring-[#bf5af2]/30 transition-shadow"
+              className="w-full h-10 pl-9 pr-4 rounded-2xl bg-secondary text-[15px] text-foreground placeholder:text-muted-foreground border-0 outline-none focus:ring-2 focus:ring-[#bf5af2]/30 transition-shadow"
               aria-label="Search conversations"
             />
           </div>
@@ -70,7 +71,7 @@ export function ConversationList() {
       </div>
 
       {/* ── List ── */}
-      <div className="flex-1 overflow-y-auto">
+      <ScrollArea className="flex-1">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 px-6 text-center animate-fade-up">
             <div className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-secondary mb-5 shadow-sm">
@@ -135,7 +136,7 @@ export function ConversationList() {
             })}
           </ul>
         )}
-      </div>
+      </ScrollArea>
     </div>
   );
 }
