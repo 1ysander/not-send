@@ -286,7 +286,7 @@ export function StatsScreen() {
   const noteWordsLeft = MAX_NOTE_WORDS - noteWords;
 
   return (
-    <PageLayout title="How you're doing">
+    <PageLayout title="Journal">
       <p className="text-[14px] text-muted-foreground -mt-1">
         Check in once a day. Watch your healing.
       </p>

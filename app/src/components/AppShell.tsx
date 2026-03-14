@@ -12,7 +12,7 @@ const navItems = [
   { path: "/", end: true, label: "Chats", icon: MessageCircle },
   { path: "/contacts", end: false, label: "Contacts", icon: Users },
   { path: "/ai-chat", end: false, label: "AI Chat", icon: Bot },
-  { path: "/stats", end: false, label: "Stats", icon: BarChart3 },
+  { path: "/stats", end: false, label: "Journal", icon: BarChart3 },
   { path: "/settings", end: false, label: "Settings", icon: Settings },
 ] as const;
 
