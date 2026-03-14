@@ -1,4 +1,4 @@
-import type { FlaggedContact, LocalSession, UserContext, PartnerContext, AIChatMessage } from "../types";
+import type { FlaggedContact, LocalSession, UserContext, PartnerContext, AIChatMessage, ContactProfile, MoodEntry } from "../types";
 
 const FLAGGED_KEY = "notsent_flaggedContacts";
 const SESSIONS_KEY = "notsent_sessions";
@@ -34,6 +34,15 @@ export function addFlaggedContact(contact: Omit<FlaggedContact, "id" | "dateAdde
 
 export function removeFlaggedContact(id: string): void {
   setFlaggedContacts(getFlaggedContacts().filter((c) => c.id !== id));
+  deleteContactProfile(id);
+}
+
+export function updateFlaggedContact(id: string, updates: { name?: string; phoneNumber?: string }): void {
+  setFlaggedContacts(
+    getFlaggedContacts().map((c) =>
+      c.id === id ? { ...c, ...updates } : c
+    )
+  );
 }
 
 export function clearFlaggedContacts(): void {
@@ -84,14 +93,6 @@ export function addSession(session: LocalSession): void {
   localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
 }
 
-export function updateLocalSessionOutcome(id: string, outcome: "intercepted" | "sent"): void {
-  const sessions = getSessions();
-  const idx = sessions.findIndex((s) => s.id === id);
-  if (idx >= 0) {
-    sessions[idx].outcome = outcome;
-    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
-  }
-}
 
 export function hasCompletedOnboarding(): boolean {
   return getFlaggedContacts().length > 0;
@@ -197,4 +198,71 @@ export function setContactAIChatHistory(contactId: string, messages: AIChatMessa
 /** Clear AI chat history for a specific contact. */
 export function clearContactAIChatHistory(contactId: string): void {
   localStorage.removeItem(`${AI_CHAT_PREFIX}${contactId}`);
+}
+
+// ─── Per-contact profile (the editable "file" for each person) ──────────────
+
+const CONTACT_PROFILE_PREFIX = "notsent_contact_profile_";
+
+/** Get all stored context for a specific contact (breakup info + partner voice). */
+export function getContactProfile(contactId: string): ContactProfile {
+  try {
+    const raw = localStorage.getItem(`${CONTACT_PROFILE_PREFIX}${contactId}`);
+    if (!raw) return {};
+    return JSON.parse(raw) as ContactProfile;
+  } catch {
+    return {};
+  }
+}
+
+/** Save all context for a specific contact. */
+export function setContactProfile(contactId: string, profile: ContactProfile): void {
+  localStorage.setItem(
+    `${CONTACT_PROFILE_PREFIX}${contactId}`,
+    JSON.stringify({ ...profile, lastUpdated: Date.now() })
+  );
+}
+
+/** Delete the profile for a contact (call when removing the contact). */
+export function deleteContactProfile(contactId: string): void {
+  localStorage.removeItem(`${CONTACT_PROFILE_PREFIX}${contactId}`);
+}
+
+// ─── Mood log ────────────────────────────────────────────────────────────────
+
+const MOOD_LOG_KEY = "notsent_mood_log";
+
+function todayDateString(): string {
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+export function getMoodLog(): MoodEntry[] {
+  try {
+    const raw = localStorage.getItem(MOOD_LOG_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as MoodEntry[];
+  } catch {
+    return [];
+  }
+}
+
+export function logMood(score: number, note?: string): void {
+  const log = getMoodLog();
+  const today = todayDateString();
+  const idx = log.findIndex((e) => e.date === today);
+  const entry = { date: today, score, ...(note !== undefined ? { note } : {}) };
+  if (idx >= 0) {
+    log[idx] = { ...log[idx], ...entry };
+  } else {
+    log.push(entry);
+  }
+  localStorage.setItem(MOOD_LOG_KEY, JSON.stringify(log));
+}
+
+export function getTodayEntry(): MoodEntry | null {
+  return getMoodLog().find((e) => e.date === todayDateString()) ?? null;
+}
+
+export function getTodayMood(): number | null {
+  return getTodayEntry()?.score ?? null;
 }

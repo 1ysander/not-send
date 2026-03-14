@@ -1,26 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getFlaggedContacts,
   clearFlaggedContacts,
-  getUserContext,
-  setUserContextLocal,
-  getDeviceId,
-  getPartnerContext,
-  setPartnerContextLocal,
 } from "@/lib/storage";
 import {
-  saveUserContextToBackend,
   checkBackendHealth,
   type BackendHealth,
-  getPartnerContextFromBackend,
-  savePartnerContextToBackend,
 } from "@/api";
-import type { UserContext } from "@/types";
 import { PageLayout } from "@/components/PageLayout";
 import { useAuth } from "@/context/AuthContext";
-import { Button } from "@/components/ui/button";
-import { LogOut, Check, ChevronRight, Wifi } from "lucide-react";
+import { LogOut, ChevronRight, Wifi } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -78,57 +68,15 @@ function SettingsRow({
 
 export function SettingsScreen() {
   const [contacts]          = useState(getFlaggedContacts());
-  const [breakupSummary, setBreakupSummary] = useState("");
-  const [noContactDays, setNoContactDays]   = useState<number | "">("");
-  const [saved, setSaved]   = useState(false);
   const navigate            = useNavigate();
   const { user, signOut }   = useAuth();
-  const partnerName         = contacts[0]?.name ?? "";
 
-  useEffect(() => {
-    const ctx = getUserContext();
-    if (ctx) {
-      setBreakupSummary(ctx.breakupSummary ?? "");
-      setNoContactDays(ctx.noContactDays ?? "");
-    }
-  }, []);
-
-  function handleSaveContext() {
-    const ctx: UserContext = {
-      breakupSummary: breakupSummary.trim() || undefined,
-      noContactDays: typeof noContactDays === "number" ? noContactDays : undefined,
-      partnerName: partnerName || undefined,
-    };
-    setUserContextLocal(ctx);
-    setSaved(true);
-    saveUserContextToBackend(getDeviceId(), ctx).catch(() => {});
-    setTimeout(() => setSaved(false), 2000);
-  }
-
-  const [backendStatus, setBackendStatus]   = useState<BackendHealth | null>(null);
-  const [partnerSynced, setPartnerSynced]   = useState(false);
+  const [backendStatus, setBackendStatus] = useState<BackendHealth | null>(null);
 
   async function handleCheckBackend() {
     setBackendStatus(null);
     const health = await checkBackendHealth();
     setBackendStatus(health);
-  }
-
-  async function handleSyncPartnerToBackend() {
-    const local = getPartnerContext();
-    if (!local?.partnerName) return;
-    await savePartnerContextToBackend(getDeviceId(), local);
-    setPartnerSynced(true);
-    setTimeout(() => setPartnerSynced(false), 2000);
-  }
-
-  async function handleLoadPartnerFromBackend() {
-    const ctx = await getPartnerContextFromBackend(getDeviceId());
-    if (ctx) {
-      setPartnerContextLocal(ctx);
-      setPartnerSynced(true);
-      setTimeout(() => setPartnerSynced(false), 2000);
-    }
   }
 
   function handleRedoOnboarding() {
@@ -179,55 +127,6 @@ export function SettingsScreen() {
         </SettingsGroup>
       </div>
 
-      {/* ── AI Context ── */}
-      <div>
-        <SectionLabel>AI Context</SectionLabel>
-        <div className="rounded-2xl border border-border bg-card p-4 space-y-3 shadow-sm">
-          <p className="text-[13px] text-muted-foreground">
-            Helps the AI reference your situation during interventions.
-          </p>
-          <textarea
-            placeholder="e.g. We broke up 2 months ago after a 3-year relationship…"
-            value={breakupSummary}
-            onChange={(e) => setBreakupSummary(e.target.value)}
-            rows={3}
-            className="w-full rounded-xl bg-secondary border-0 px-3.5 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/60 outline-none focus:ring-2 focus:ring-[#bf5af2]/30 resize-none transition-shadow"
-          />
-          <div className="flex items-center gap-3">
-            <div className="flex-1">
-              <label className="text-[12px] font-semibold text-muted-foreground block mb-1.5">
-                No contact (days)
-              </label>
-              <input
-                type="number"
-                min={0}
-                placeholder="14"
-                value={noContactDays}
-                onChange={(e) =>
-                  setNoContactDays(e.target.value === "" ? "" : parseInt(e.target.value, 10))
-                }
-                className="w-20 h-10 rounded-xl bg-secondary border-0 px-3 text-[15px] text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-[#bf5af2]/30 transition-shadow"
-              />
-            </div>
-            <Button
-              variant={saved ? "secondary" : "default"}
-              size="sm"
-              onClick={handleSaveContext}
-              className="flex-shrink-0 gap-1.5"
-            >
-              {saved ? (
-                <>
-                  <Check className="h-3.5 w-3.5" />
-                  Saved
-                </>
-              ) : (
-                "Save"
-              )}
-            </Button>
-          </div>
-        </div>
-      </div>
-
       {/* ── Contacts ── */}
       <div>
         <SectionLabel>Contacts</SectionLabel>
@@ -259,19 +158,6 @@ export function SettingsScreen() {
               )
             }
             onClick={handleCheckBackend}
-          />
-          <SettingsRow
-            label="Load partner from backend"
-            onClick={handleLoadPartnerFromBackend}
-          />
-          <SettingsRow
-            label={partnerSynced ? "Synced" : "Save partner to backend"}
-            right={
-              partnerSynced
-                ? <Check className="h-4 w-4 text-[#30d158]" />
-                : <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            }
-            onClick={handleSyncPartnerToBackend}
           />
         </SettingsGroup>
       </div>

@@ -3,12 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { getFlaggedContacts, getSessionsForContact } from "@/lib/storage";
 import { useConversationSocketOptional } from "@/contexts/ConversationSocketContext";
 import { Button } from "@/components/ui/button";
+import { ContactAvatar } from "@/components/ContactAvatar";
 import { MessageCircle, Search, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-function getInitial(name: string): string {
-  return name.trim() ? name.trim()[0].toUpperCase() : "?";
-}
 
 function formatTime(ts: number): string {
   const now  = Date.now();
@@ -17,20 +14,6 @@ function formatTime(ts: number): string {
   if (diff < 3_600_000)  return `${Math.floor(diff / 60_000)}m`;
   if (diff < 86_400_000) return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   return new Date(ts).toLocaleDateString([], { month: "short", day: "numeric" });
-}
-
-// Subtle avatar colors keyed by first letter
-const AVATAR_COLORS: Record<string, string> = {
-  A: "bg-[#bf5af2]/15 text-[#bf5af2]",
-  B: "bg-[#ff375f]/15 text-[#ff375f]",
-  C: "bg-[#30d158]/15 text-[#30d158]",
-  D: "bg-[#0a84ff]/15 text-[#0a84ff]",
-  E: "bg-[#ff9f0a]/15 text-[#ff9f0a]",
-  F: "bg-[#ff6961]/15 text-[#ff6961]",
-};
-function avatarColor(name: string): string {
-  const c = AVATAR_COLORS[name.trim()[0]?.toUpperCase()];
-  return c ?? "bg-secondary text-foreground";
 }
 
 export function ConversationList() {
@@ -117,7 +100,6 @@ export function ConversationList() {
                 : null;
               const preview  = last?.messageAttempted?.slice(0, 55) ?? "Tap to start";
               const truncated = (last?.messageAttempted?.length ?? 0) > 55;
-              const intercepted = last?.outcome === "intercepted";
 
               return (
                 <li key={contact.id}>
@@ -129,13 +111,7 @@ export function ConversationList() {
                       "hover:bg-secondary/50 active:bg-secondary/80 transition-colors text-left"
                     )}
                   >
-                    {/* Avatar */}
-                    <div className={cn(
-                      "flex h-[46px] w-[46px] flex-shrink-0 items-center justify-center rounded-full text-[17px] font-semibold",
-                      avatarColor(contact.name)
-                    )}>
-                      {getInitial(contact.name)}
-                    </div>
+                    <ContactAvatar contact={contact} size="xl" />
 
                     {/* Text */}
                     <div className="min-w-0 flex-1">
@@ -149,11 +125,7 @@ export function ConversationList() {
                           </span>
                         )}
                       </div>
-                      <p className={cn(
-                        "text-[14px] truncate mt-0.5",
-                        intercepted ? "text-muted-foreground italic" : "text-muted-foreground"
-                      )}>
-                        {intercepted && "Not sent · "}
+                      <p className="text-[14px] truncate mt-0.5 text-muted-foreground">
                         {preview}{truncated ? "…" : ""}
                       </p>
                     </div>

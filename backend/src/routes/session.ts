@@ -1,7 +1,6 @@
 import { Router } from "express";
 import {
   createSession,
-  updateSessionOutcome,
   getSession,
   setUserContext,
 } from "../store.js";
@@ -29,20 +28,6 @@ sessionRoutes.post("/", (req, res) => {
   res.status(201).json({ sessionId: session.id });
 });
 
-sessionRoutes.patch("/:id", (req, res) => {
-  const { id } = req.params;
-  const { outcome } = req.body ?? {};
-  if (outcome !== "intercepted" && outcome !== "sent") {
-    res.status(400).json({ error: "outcome must be 'intercepted' or 'sent'" });
-    return;
-  }
-  const updated = updateSessionOutcome(id, outcome);
-  if (!updated) {
-    res.status(404).json({ error: "Session not found" });
-    return;
-  }
-  res.json(updated);
-});
 
 sessionRoutes.get("/:id", (req, res) => {
   const session = getSession(req.params.id);

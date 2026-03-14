@@ -13,6 +13,7 @@ import { streamChat } from "../ai/model.js";
 import { buildInterventionSystemPrompt } from "../prompts/intervention.js";
 import { buildClosureSystemPrompt } from "../prompts/closure.js";
 import { buildSupportSystemPrompt } from "../prompts/support.js";
+import { buildContactChatSystemPrompt } from "../prompts/contactChat.js";
 import {
   appendConversationTurn,
   getConversationHistory,
@@ -178,6 +179,14 @@ export interface ClosureStreamOptions {
 export interface SupportStreamOptions {
   messages: Array<{ role: string; content: string }>;
   userContext?: UserContext;
+  partnerContext?: PartnerContext;
+  deviceId?: string;
+}
+
+export interface ContactChatStreamOptions {
+  messages: Array<{ role: string; content: string }>;
+  partnerContext: PartnerContext;
+  userContext?: UserContext;
   deviceId?: string;
 }
 
@@ -237,19 +246,44 @@ export async function streamSupport(
   opts: SupportStreamOptions,
   onChunk: StreamCallback
 ): Promise<void> {
-  const { messages, userContext, deviceId } = opts;
+  const { messages, userContext, partnerContext, deviceId } = opts;
 
   const resolvedUserContext: UserContext | undefined =
     userContext ??
     (deviceId ? getUserContext(deviceId) : undefined);
 
-  const systemPrompt = buildSupportSystemPrompt(resolvedUserContext);
+  const systemPrompt = buildSupportSystemPrompt(resolvedUserContext, partnerContext);
 
   const chatMessages: ChatMessage[] = messages
     .filter((m) => m.role === "user" || m.role === "assistant")
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
   await streamChat({ systemPrompt, messages: chatMessages }, onChunk);
+}
+
+// Max turns to send per request — keeps token usage low on free tier
+const CONTACT_CHAT_HISTORY_TURNS = 6;
+const CONTACT_CHAT_MAX_TOKENS = 300;
+
+export async function streamContactChat(
+  opts: ContactChatStreamOptions,
+  onChunk: StreamCallback
+): Promise<void> {
+  const { messages, partnerContext, userContext, deviceId } = opts;
+
+  const resolvedUserContext: UserContext | undefined =
+    userContext ??
+    (deviceId ? getUserContext(deviceId) : undefined);
+
+  const systemPrompt = buildContactChatSystemPrompt(partnerContext, resolvedUserContext);
+
+  // Cap history to last N turns to avoid burning tokens on long conversations
+  const chatMessages: ChatMessage[] = messages
+    .filter((m) => m.role === "user" || m.role === "assistant")
+    .slice(-CONTACT_CHAT_HISTORY_TURNS)
+    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+
+  await streamChat({ systemPrompt, messages: chatMessages, maxTokens: CONTACT_CHAT_MAX_TOKENS }, onChunk);
 }
 
 export function getHistory(sessionId: string) {

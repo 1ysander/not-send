@@ -22,7 +22,6 @@ export function createSession(
   const session: Session = {
     id,
     messageAttempted,
-    outcome: "draft",
     createdAt: Date.now(),
   };
   sessions.set(id, session);
@@ -32,19 +31,11 @@ export function createSession(
   return session;
 }
 
-export function updateSessionOutcome(
-  id: string,
-  outcome: "intercepted" | "sent"
-): Session | undefined {
-  const session = sessions.get(id);
-  if (!session) return undefined;
-  session.outcome = outcome;
-  return session;
-}
 
 export function getSession(id: string): Session | undefined {
   return sessions.get(id);
 }
+
 
 export function getAllSessions(): Session[] {
   return Array.from(sessions.values());
@@ -97,10 +88,3 @@ export function getPartnerContext(deviceId: string): PartnerContext | undefined 
   return partnerContextByDevice.get(deviceId);
 }
 
-export function getStats(): { interceptionsCount: number; messagesNeverSentCount: number } {
-  const all = Array.from(sessions.values());
-  return {
-    interceptionsCount: all.filter((s) => s.outcome === "intercepted").length,
-    messagesNeverSentCount: all.filter((s) => s.outcome !== "sent").length,
-  };
-}

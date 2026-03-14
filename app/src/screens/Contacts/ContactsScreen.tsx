@@ -8,13 +8,8 @@ import {
 } from "@/lib/storage";
 import { PageLayout } from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
+import { ContactAvatar } from "@/components/ContactAvatar";
 import { Plus, Trash2, X } from "lucide-react";
-import { cn } from "@/lib/utils";
-
-function getInitial(name: string): string {
-  const n = name.trim();
-  return n ? n[0].toUpperCase() : "?";
-}
 
 export function ContactsScreen() {
   const [contacts, setContacts] = useState(getFlaggedContacts());
@@ -129,20 +124,24 @@ export function ContactsScreen() {
           <div className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border/60 shadow-sm">
             {contacts.map((c) => (
               <div key={c.id} className="flex items-center gap-3 px-4 py-3.5">
-                <div className={cn(
-                  "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-[15px] font-semibold",
-                  "bg-[#bf5af2]/15 text-[#bf5af2]"
-                )}>
-                  {getInitial(c.name)}
-                </div>
+                <ContactAvatar contact={c} size="lg" />
                 <button
                   type="button"
                   className="min-w-0 flex-1 text-left"
-                  onClick={() => navigate(`/chat/${c.id}`)}
+                  onClick={() => navigate(`/contacts/${c.id}`)}
                 >
                   <p className="text-[15px] font-medium text-foreground truncate">{c.name}</p>
                   <p className="text-[13px] text-muted-foreground truncate">{c.phoneNumber}</p>
                 </button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground flex-shrink-0 text-[12px]"
+                  onClick={() => navigate(`/chat/${c.id}`)}
+                  aria-label="Open intervention chat"
+                >
+                  Chat
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon-sm"

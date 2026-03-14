@@ -1,15 +1,14 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { MessageCircle, Bot, Inbox, Users, BarChart3, Settings, Plus } from "lucide-react";
+import { MessageCircle, Users, BarChart3, Settings, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Layout } from "@/components/layout/Layout";
 import { Sidebar } from "@/components/ui/Sidebar";
+import { ContactAvatar } from "@/components/ContactAvatar";
 import { getFlaggedContacts, getSessionsForContact } from "@/lib/storage";
 import { useConversationSocketOptional } from "@/contexts/ConversationSocketContext";
 
 const navItems = [
   { path: "/", end: true, label: "Chats", icon: MessageCircle },
-  { path: "/ai-chat", end: false, label: "AI Chat", icon: Bot },
-  { path: "/conversations", end: false, label: "Inbox", icon: Inbox },
   { path: "/contacts", end: false, label: "Contacts", icon: Users },
   { path: "/stats", end: false, label: "Stats", icon: BarChart3 },
   { path: "/settings", end: false, label: "Settings", icon: Settings },
@@ -20,10 +19,6 @@ function isActive(path: string, end: boolean, current: string) {
   return current === path || current.startsWith(path + "/");
 }
 
-function getInitial(name: string): string {
-  return name.trim() ? name.trim()[0].toUpperCase() : "?";
-}
-
 function formatTime(ts: number): string {
   const now = Date.now();
   const diff = now - ts;
@@ -31,19 +26,6 @@ function formatTime(ts: number): string {
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m`;
   if (diff < 86_400_000) return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   return new Date(ts).toLocaleDateString([], { month: "short", day: "numeric" });
-}
-
-const AVATAR_COLORS: Record<string, string> = {
-  A: "bg-neutral-200 text-neutral-700",
-  B: "bg-neutral-200 text-neutral-700",
-  C: "bg-neutral-200 text-neutral-700",
-  D: "bg-neutral-200 text-neutral-700",
-  E: "bg-neutral-200 text-neutral-700",
-  F: "bg-neutral-200 text-neutral-700",
-};
-function avatarColor(name: string): string {
-  const c = AVATAR_COLORS[name.trim()[0]?.toUpperCase()];
-  return c ?? "bg-secondary text-foreground";
 }
 
 export function AppShell() {
@@ -125,14 +107,7 @@ export function AppShell() {
                         isActiveChat ? "bg-secondary" : "hover:bg-secondary/70"
                       )}
                     >
-                      <div
-                        className={cn(
-                          "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold",
-                          avatarColor(contact.name)
-                        )}
-                      >
-                        {getInitial(contact.name)}
-                      </div>
+                      <ContactAvatar contact={contact} size="md" />
                       <div className="min-w-0 flex-1">
                         <p className="text-[14px] font-medium text-foreground truncate">
                           {contact.name}

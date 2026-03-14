@@ -4,15 +4,13 @@
  * (simulate texting ex for closure without reaching out).
  */
 
-export type SessionOutcome = "intercepted" | "sent" | "draft";
-
 export type Sentiment = "distress" | "longing" | "anger" | "neutral";
 
 export interface Session {
   id: string;
   messageAttempted: string;
-  outcome: SessionOutcome;
   createdAt: number;
+  outcome?: "intercepted" | "sent";
 }
 
 /** One turn in an intervention or closure conversation (for history + API tokens). */
@@ -66,6 +64,12 @@ export interface RelationshipMemory {
   partnerMessageCount: number;
   /** Number of messages from the user in the upload */
   userMessageCount: number;
+  /** Classified response speed based on measured reply gaps */
+  responseDelayProfile: "instant" | "quick" | "slow" | "unpredictable";
+  /** Median partner response time in seconds (0 if timestamps unavailable) */
+  typicalDelaySeconds: number;
+  /** True if the partner often took >15 min to reply — "leaves on read" behaviour */
+  readsWithoutReplying: boolean;
 }
 
 /** Optional context about the ex for closure flow: simulate their voice without reaching out. */

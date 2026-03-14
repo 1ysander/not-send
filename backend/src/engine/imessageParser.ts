@@ -24,7 +24,7 @@ export interface ParseIMExportResult {
  * Format 1: [MM/DD/YY, HH:MM AM/PM] Sender: text
  * Common in iExporter, AnyTrans, iPhone Backup Extractor
  */
-const FORMAT1_LINE = /^\[(\d{1,2}\/\d{1,2}\/\d{2,4}),?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?\]\s+(.+?):\s+(.*)/i;
+const FORMAT1_LINE = /^\[(\d{1,2}\/\d{1,2}\/\d{2,4}),?\s+(\d{1,2}:\d{2}(?::\d{2})?)\s*(AM|PM)?\]\s+(.+?):\s+(.*)/i;
 
 /**
  * Format 2: Sender | MM/DD/YYYY HH:MM\n<text on next line>
@@ -52,6 +52,25 @@ const FORMAT5_DATE = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,
 interface RawEntry {
   sender: string;
   text: string;
+  timestamp?: number;
+}
+
+function parseFormat1Timestamp(datePart: string, timePart: string, ampm: string | undefined): number | undefined {
+  try {
+    // datePart: MM/DD/YY or MM/DD/YYYY, timePart: HH:MM or HH:MM:SS
+    const [month, day, year] = datePart.split("/").map(Number);
+    const fullYear = year < 100 ? 2000 + year : year;
+    const [hours, minutes] = timePart.split(":").map(Number);
+    let h = hours;
+    if (ampm) {
+      const upper = ampm.toUpperCase();
+      if (upper === "PM" && h !== 12) h += 12;
+      if (upper === "AM" && h === 12) h = 0;
+    }
+    return new Date(fullYear, month - 1, day, h, minutes).getTime();
+  } catch {
+    return undefined;
+  }
 }
 
 function parseFormat1(lines: string[]): RawEntry[] | null {
@@ -59,7 +78,9 @@ function parseFormat1(lines: string[]): RawEntry[] | null {
   for (const line of lines) {
     const m = line.match(FORMAT1_LINE);
     if (m) {
-      entries.push({ sender: m[2].trim(), text: m[3].trim() });
+      // m[1]=date m[2]=time m[3]=ampm m[4]=sender m[5]=text
+      const timestamp = parseFormat1Timestamp(m[1], m[2], m[3]);
+      entries.push({ sender: m[4].trim(), text: m[5].trim(), timestamp });
     }
   }
   return entries.length > 2 ? entries : null;
@@ -243,6 +264,7 @@ export function parseIMExport(
     .map((e) => ({
       fromPartner: e.sender === partnerSender,
       text: e.text,
+      timestamp: e.timestamp,
     }))
     .filter((m) => m.text.length > 0);
 

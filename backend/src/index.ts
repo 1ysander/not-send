@@ -10,27 +10,27 @@ import { chatRoutes } from "./routes/chat.js";
 import { contextRoutes } from "./routes/context.js";
 import { engineRoutes } from "./routes/engine.js";
 import { parseRoutes } from "./routes/parse.js";
+import { personaRoutes } from "./routes/persona.js";
 
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT ?? 3001;
 
-const CORS_ORIGINS = [
-  "http://localhost:5173",
-  "http://localhost:5174",
-  "http://127.0.0.1:5173",
-  "http://127.0.0.1:5174",
-];
+// Allow any localhost/127.0.0.1 origin in dev (Vite picks a free port each run)
+function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+}
 
 const io = new SocketServer(server, {
-  cors: { origin: CORS_ORIGINS, credentials: true },
+  cors: { origin: isAllowedOrigin, credentials: true },
 });
 setIO(io);
 
-// CORS: allow app origin (Vite default)
+// CORS: allow any localhost origin (Vite port varies)
 app.use(
   cors({
-    origin: CORS_ORIGINS,
+    origin: isAllowedOrigin,
     credentials: true,
   })
 );
@@ -80,6 +80,7 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/context", contextRoutes);
 app.use("/api/engine", engineRoutes);
 app.use("/api/parse-imessage", parseRoutes);
+app.use("/api/persona", personaRoutes);
 
 server.listen(PORT, () => {
   console.log(`NOTSENT backend running at http://localhost:${PORT}`);

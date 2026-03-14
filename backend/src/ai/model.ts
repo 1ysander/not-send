@@ -11,7 +11,8 @@ import { getCannedInterventionReply } from "./canned.js";
 const DEFAULT_MAX_TOKENS = 1024;
 const INTERVENTION_MODEL_ANTHROPIC = "claude-sonnet-4-20250514";
 const INTERVENTION_MODEL_OPENAI = "gpt-4o-mini";
-const INTERVENTION_MODEL_GEMINI = "gemini-flash-latest";
+const INTERVENTION_MODEL_GEMINI = "gemini-2.0-flash";
+const INTERVENTION_MODEL_GROQ = "llama-3.1-8b-instant";
 
 /**
  * Stream a reply using the configured provider (Anthropic, OpenAI, or canned).
@@ -26,7 +27,7 @@ export async function streamChat(
     messageAttempted?: string;
   },
   onChunk: StreamChunkCallback
-): Promise<{ provider: "anthropic" | "openai" | "gemini" | "canned" }> {
+): Promise<{ provider: "anthropic" | "openai" | "gemini" | "groq" | "canned" }> {
   const config = getAIConfig();
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
 
@@ -62,6 +63,16 @@ export async function streamChat(
   if (config.provider === "gemini" && config.geminiApiKey) {
     return streamGemini(
       config.geminiApiKey,
+      options.systemPrompt,
+      options.messages,
+      maxTokens,
+      onChunk
+    );
+  }
+
+  if (config.provider === "groq" && config.groqApiKey) {
+    return streamGroq(
+      config.groqApiKey,
       options.systemPrompt,
       options.messages,
       maxTokens,
@@ -174,6 +185,37 @@ async function streamGemini(
   return { provider: "gemini" };
 }
 
+async function streamGroq(
+  apiKey: string,
+  systemPrompt: string,
+  messages: ChatMessage[],
+  maxTokens: number,
+  onChunk: StreamChunkCallback
+): Promise<{ provider: "groq" }> {
+  const OpenAI = await import("openai").then((m) => m.default);
+  // Groq is OpenAI-API-compatible — just point baseURL at Groq
+  const groq = new OpenAI({ apiKey, baseURL: "https://api.groq.com/openai/v1" });
+  const stream = await groq.chat.completions.create({
+    model: INTERVENTION_MODEL_GROQ,
+    max_tokens: maxTokens,
+    stream: true,
+    messages: [
+      { role: "system", content: systemPrompt },
+      ...messages
+        .filter((m) => m.role !== "system")
+        .map((m) => ({
+          role: m.role as "user" | "assistant" | "system",
+          content: m.content,
+        })),
+    ],
+  });
+  for await (const chunk of stream) {
+    const delta = chunk.choices[0]?.delta?.content;
+    if (typeof delta === "string" && delta) onChunk(delta);
+  }
+  return { provider: "groq" };
+}
+
 /**
  * Non-streaming: get full reply (uses stream under the hood and concatenates).
  * Use when you don't need streaming (e.g. server-side only).
@@ -183,7 +225,7 @@ export async function chat(options: {
   messages: ChatMessage[];
   maxTokens?: number;
   messageAttempted?: string;
-}): Promise<{ text: string; provider: "anthropic" | "openai" | "gemini" | "canned" }> {
+}): Promise<{ text: string; provider: "anthropic" | "openai" | "gemini" | "groq" | "canned" }> {
   const parts: string[] = [];
   const { provider } = await streamChat(options, (t) => parts.push(t));
   return { text: parts.join(""), provider };

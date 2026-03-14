@@ -2,13 +2,9 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getFlaggedContacts, getSessionsForContact } from "@/lib/storage";
 import { Input } from "@/components/ui/input";
+import { ContactAvatar } from "@/components/ContactAvatar";
 import { Search, MessageCircle, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-function getInitial(name: string): string {
-  const n = name.trim();
-  return n ? n[0].toUpperCase() : "?";
-}
 
 /** Sidebar list of conversations for chat layout. */
 export function ConversationSidebar() {
@@ -75,9 +71,7 @@ export function ConversationSidebar() {
                   : null;
               const preview =
                 last?.messageAttempted?.slice(0, 32) ?? "No messages yet";
-              const unread = sessions.filter(
-                (s) => s.outcome === "draft" || s.outcome === "intercepted"
-              ).length;
+              const unread = sessions.length;
               const time = last
                 ? new Date(last.timestamp).toLocaleTimeString([], {
                     hour: "numeric",
@@ -97,9 +91,7 @@ export function ConversationSidebar() {
                       isActive && "bg-accent border-primary/20"
                     )}
                   >
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
-                      {getInitial(contact.name)}
-                    </div>
+                    <ContactAvatar contact={contact} size="md" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-sm">
                         {contact.name}

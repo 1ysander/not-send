@@ -5,7 +5,7 @@
 
 import type { RelationshipMemory } from "../types.js";
 
-type ParsedMessage = { fromPartner: boolean; text: string };
+type ParsedMessage = { fromPartner: boolean; text: string; timestamp?: number };
 
 // Emoji regex (matches most emoji ranges)
 const EMOJI_REGEX =
@@ -106,6 +106,61 @@ function detectRecurringTopics(messages: ParsedMessage[]): string[] {
   return [...scores.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
 }
 
+function computeResponseTiming(allMessages: ParsedMessage[]): {
+  responseDelayProfile: RelationshipMemory["responseDelayProfile"];
+  typicalDelaySeconds: number;
+  readsWithoutReplying: boolean;
+} {
+  // Collect gaps: user sends → partner replies next
+  const gaps: number[] = [];
+  for (let i = 0; i < allMessages.length - 1; i++) {
+    const curr = allMessages[i];
+    const next = allMessages[i + 1];
+    if (!curr.fromPartner && next.fromPartner && curr.timestamp && next.timestamp) {
+      const gapSec = (next.timestamp - curr.timestamp) / 1000;
+      // Only count plausible reply windows (1 second to 24 hours)
+      if (gapSec >= 1 && gapSec <= 86400) {
+        gaps.push(gapSec);
+      }
+    }
+  }
+
+  if (gaps.length < 3) {
+    return { responseDelayProfile: "quick", typicalDelaySeconds: 60, readsWithoutReplying: false };
+  }
+
+  // Median
+  const sorted = [...gaps].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+
+  // Variance check for "unpredictable"
+  const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+  const variance = gaps.reduce((acc, g) => acc + Math.pow(g - mean, 2), 0) / gaps.length;
+  const stdDev = Math.sqrt(variance);
+  const isUnpredictable = stdDev > mean * 1.5; // high coefficient of variation
+
+  let responseDelayProfile: RelationshipMemory["responseDelayProfile"];
+  if (isUnpredictable) {
+    responseDelayProfile = "unpredictable";
+  } else if (median < 60) {
+    responseDelayProfile = "instant";
+  } else if (median < 600) {
+    responseDelayProfile = "quick";
+  } else {
+    responseDelayProfile = "slow";
+  }
+
+  // "Reads without replying": median > 15 minutes OR > 40% of gaps > 15 min
+  const longDelayCount = gaps.filter((g) => g > 900).length;
+  const readsWithoutReplying = median > 900 || longDelayCount / gaps.length > 0.4;
+
+  return {
+    responseDelayProfile,
+    typicalDelaySeconds: Math.round(median),
+    readsWithoutReplying,
+  };
+}
+
 function detectTone(messages: ParsedMessage[]): RelationshipMemory["partnerTone"] {
   const text = messages.map((m) => m.text.toLowerCase()).join(" ");
   const warmWords = ["love", "miss", "care", "heart", "sweet", "beautiful", "amazing", "wonderful"];
@@ -156,6 +211,9 @@ export function buildRelationshipMemory(
       partnerTone: "casual",
       partnerMessageCount: 0,
       userMessageCount: userMsgs.length,
+      responseDelayProfile: "quick",
+      typicalDelaySeconds: 60,
+      readsWithoutReplying: false,
     };
   }
 
@@ -194,6 +252,10 @@ export function buildRelationshipMemory(
   // Tone
   const partnerTone = detectTone(partnerMsgs);
 
+  // Response timing
+  const { responseDelayProfile, typicalDelaySeconds, readsWithoutReplying } =
+    computeResponseTiming(allMessages);
+
   return {
     avgMessageLength,
     usesLowercase,
@@ -207,5 +269,8 @@ export function buildRelationshipMemory(
     partnerTone,
     partnerMessageCount: partnerMsgs.length,
     userMessageCount: userMsgs.length,
+    responseDelayProfile,
+    typicalDelaySeconds,
+    readsWithoutReplying,
   };
 }

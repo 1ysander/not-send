@@ -1,9 +1,14 @@
 import { Router } from "express";
-import { getStats } from "../store.js";
+import { getAllSessions, getConversationHistory } from "../store.js";
 
 export const statsRoutes = Router();
 
 statsRoutes.get("/stats", (_req, res) => {
-  const { interceptionsCount, messagesNeverSentCount } = getStats();
-  res.json({ interceptionsCount, messagesNeverSentCount });
+  const sessions = getAllSessions();
+  let totalMessages = 0;
+  for (const session of sessions) {
+    const history = getConversationHistory(session.id);
+    totalMessages += history.length;
+  }
+  res.json({ sessionCount: sessions.length, totalMessages });
 });

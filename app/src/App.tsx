@@ -9,13 +9,12 @@ import { YoureSetScreen } from "./screens/Onboarding/YoureSetScreen";
 import { LoginScreen } from "./screens/Login/LoginScreen";
 import Page from "./page";
 import { ChatScreen } from "./screens/Chat/ChatScreen";
-import { InterventionChat } from "./screens/Intervention/InterventionChat";
-import { ManageConversationsScreen } from "./screens/Conversations/ManageConversationsScreen";
+import { ClosureScreen } from "./screens/Closure/ClosureScreen";
+import { AIChatScreen } from "./screens/AIChat/AIChatScreen";
 import { StatsScreen } from "./screens/Stats/StatsScreen";
 import { SettingsScreen } from "./screens/Settings/SettingsScreen";
 import { ContactsScreen } from "./screens/Contacts/ContactsScreen";
-import { AIChatScreen } from "./screens/AIChat/AIChatScreen";
-import { ContactAIChatScreen } from "./screens/AIChat/ContactAIChatScreen";
+import { ContactProfileScreen } from "./screens/Contacts/ContactProfileScreen";
 
 /** Guards the main app: requires auth (when Supabase enabled) + onboarding. */
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -58,15 +57,15 @@ export default function App() {
       <Route path="/onboarding/set" element={<PublicOnboardingOnly><YoureSetScreen /></PublicOnboardingOnly>} />
       <Route path="/" element={<AuthGuard><ConversationSocketProvider><AppShell /></ConversationSocketProvider></AuthGuard>}>
         <Route index element={<Page />} />
-        <Route path="ai-chat" element={<AIChatScreen />} />
-        <Route path="conversations" element={<ManageConversationsScreen />} />
-        <Route path="contacts" element={<ContactsScreen />} />
+<Route path="contacts" element={<ContactsScreen />} />
+        <Route path="contacts/:contactId" element={<ContactProfileScreen />} />
         <Route path="stats" element={<StatsScreen />} />
         <Route path="settings" element={<SettingsScreen />} />
         <Route path="chat/:contactId" element={<ChatScreen />} />
+        <Route path="closure/:contactId" element={<ClosureScreen />} />
+        <Route path="ai-chat" element={<AIChatScreen />} />
       </Route>
-      <Route path="/intervention" element={<InterventionChat />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+<Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

@@ -6,38 +6,25 @@ import {
   deleteSessionsForContact,
   clearAllSessions,
 } from "@/lib/storage";
-import type { LocalSession } from "@/types";
 import { PageLayout } from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-function getInitial(name: string): string {
-  const n = name.trim();
-  return n ? n[0].toUpperCase() : "?";
-}
-
-function outcomeLabel(outcome: LocalSession["outcome"]): string {
-  switch (outcome) {
-    case "draft": return "Stopped";
-    case "intercepted": return "Didn't send";
-    case "sent": return "Sent anyway";
-    default: return outcome;
-  }
-}
+import { ContactAvatar } from "@/components/ContactAvatar";
 
 export function ManageConversationsScreen() {
   const [contacts, setContacts] = useState(getFlaggedContacts());
   const [confirmClearContact, setConfirmClearContact] = useState<string | null>(null);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
 
-  const contactStats = useMemo(() => {
-    return contacts.map((contact) => {
-      const sessions = getSessionsForContact(contact.id);
-      const stopped = sessions.filter((s) => s.outcome === "draft" || s.outcome === "intercepted").length;
-      const sentAnyway = sessions.filter((s) => s.outcome === "sent").length;
-      const sorted = [...sessions].sort((a, b) => b.timestamp - a.timestamp);
-      return { contact, sessions, stopped, sentAnyway, recent: sorted.slice(0, 5) };
-    });
-  }, [contacts]);
+  const contactStats = useMemo(
+    () =>
+      contacts.map((contact) => {
+        const sessions = getSessionsForContact(contact.id);
+        const sorted = [...sessions].sort((a, b) => b.timestamp - a.timestamp);
+        return { contact, sessions, recent: sorted.slice(0, 5) };
+      }),
+    [contacts],
+  );
 
   const totalSessions = useMemo(() => contactStats.reduce((n, c) => n + c.sessions.length, 0), [contactStats]);
 
@@ -62,18 +49,16 @@ export function ManageConversationsScreen() {
         </div>
       ) : (
         <div className="space-y-6">
-          {contactStats.map(({ contact, sessions, stopped, sentAnyway, recent }) => (
+          {contactStats.map(({ contact, sessions, recent }) => (
             <Card key={contact.id} className="rounded-xl shadow-card">
               <CardContent className="p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <Link to={`/chat/${contact.id}`} className="flex min-w-0 items-center gap-3 text-foreground no-underline hover:opacity-80">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
-                      {getInitial(contact.name)}
-                    </div>
+                    <ContactAvatar contact={contact} size="md" />
                     <div className="min-w-0">
                       <p className="font-medium truncate">{contact.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {sessions.length} conversation{sessions.length !== 1 ? "s" : ""} — {stopped} stopped, {sentAnyway} sent anyway
+                        {sessions.length} conversation{sessions.length !== 1 ? "s" : ""}
                       </p>
                     </div>
                   </Link>
@@ -92,7 +77,7 @@ export function ManageConversationsScreen() {
                 {recent.length > 0 && (
                   <ul className="mt-3 list-inside list-disc space-y-0.5 text-sm text-muted-foreground">
                     {recent.map((s) => (
-                      <li key={s.id}>"{s.messageAttempted.length > 50 ? s.messageAttempted.slice(0, 50) + "…" : s.messageAttempted}" — {outcomeLabel(s.outcome)}</li>
+                      <li key={s.id}>"{s.messageAttempted.length > 50 ? s.messageAttempted.slice(0, 50) + "…" : s.messageAttempted}"</li>
                     ))}
                   </ul>
                 )}

@@ -1,390 +1,305 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Trash2, ChevronLeft, Shield, HeartCrack, Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ChevronLeft, Trash2, Heart } from "lucide-react";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { InputBar } from "@/components/chat/InputBar";
+import { MessageBubble } from "@/components/chat/MessageBubble";
+import type { DeliveryStatus } from "@/components/chat/MessageBubble";
+import { ContactAvatar } from "@/components/ContactAvatar";
 import {
   getFlaggedContacts,
   getDeviceId,
+  getContactProfile,
   getUserContext,
-  addSession,
-  getSessionsForContact,
-  deleteSessionsForContact,
-  updateLocalSessionOutcome,
+  getContactAIChatHistory,
+  setContactAIChatHistory,
+  clearContactAIChatHistory,
 } from "../../lib/storage";
-import { startReview, streamReviewResponse, recordOutcome } from "../../core";
-import { webReviewTransport } from "../../adapters/webTransport";
-import { useConversationSocketOptional } from "@/contexts/ConversationSocketContext";
-import type { LocalSession } from "../../types";
+import { streamContactChatAPI } from "../../api";
+import type { AIChatMessage, RelationshipMemory } from "../../types";
 
-interface InterventionState {
-  sessionId: string;
-  messageAttempted: string;
-  reply: string;
-  loading: boolean;
-  error: string | null;
-  actionLoading: boolean;
+type ChatStatus = "idle" | "typing";
+
+function computeUiDelayMs(mem: RelationshipMemory | undefined): number {
+  if (!mem) return 1200;
+  const jitter = () => Math.random() * 600 - 300;
+  switch (mem.responseDelayProfile) {
+    case "instant":       return Math.max(400, 800 + jitter());
+    case "quick":         return Math.max(800, 2200 + jitter());
+    case "slow":          return Math.max(2000, 5000 + jitter() * 2);
+    case "unpredictable": return 800 + Math.random() * 6000;
+    default:              return 1500;
+  }
 }
 
-const CANNED_REPLY = `Hey — before you hit send, take a breath.
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-Sending might not give you what you're really looking for. What do you actually need right now that isn't them? You've got this.`;
+const STARTERS = [
+  "Hey",
+  "I've been thinking about you",
+  "Can we talk?",
+  "I miss you",
+];
 
 export function ChatScreen() {
   const { contactId } = useParams<{ contactId: string }>();
-  const contacts      = getFlaggedContacts();
-  const contact       = useMemo(
-    () => (contactId ? contacts.find((c) => c.id === contactId) : null),
-    [contacts, contactId]
-  );
+  const navigate = useNavigate();
 
-  const [sessions, setSessions]             = useState<LocalSession[]>(() =>
-    contactId ? getSessionsForContact(contactId) : []
-  );
-  const [input, setInput]                   = useState("");
-  const [sending, setSending]               = useState(false);
-  const [error, setError]                   = useState("");
-  const [showDeleteConfirm, setShowDelete]  = useState(false);
-  const [intervention, setIntervention]     = useState<InterventionState | null>(null);
-  const threadEndRef                        = useRef<HTMLDivElement>(null);
-  const navigate                            = useNavigate();
-  const socket                              = useConversationSocketOptional();
-  const liveMessages                        = intervention ? socket?.getMessages(intervention.sessionId) : undefined;
-  const liveReply                           = liveMessages?.filter((m) => m.role === "assistant").pop()?.content ?? null;
+  const contact = contactId
+    ? getFlaggedContacts().find((c) => c.id === contactId) ?? null
+    : null;
 
-  function refreshSessions() {
-    if (contactId) setSessions(getSessionsForContact(contactId));
-  }
+  const [messages, setMessages] = useState<AIChatMessage[]>(() =>
+    contactId ? getContactAIChatHistory(contactId) : []
+  );
+  const [input, setInput] = useState("");
+  const [status, setStatus] = useState<ChatStatus>("idle");
+  const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus>("none");
+  const [error, setError] = useState<string | null>(null);
+  const [showClear, setShowClear] = useState(false);
+  const endRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [intervention?.reply, intervention?.loading, sessions]);
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-  async function handleSend(e?: React.FormEvent) {
-    e?.preventDefault();
-    const text = input.trim();
-    if (!text || sending || !contactId || !contact) return;
-    setError("");
-    setSending(true);
-    setInput("");
+  useEffect(() => {
+    if (contactId) setContactAIChatHistory(contactId, messages);
+  }, [messages, contactId]);
 
-    let sessionId: string;
-    try {
-      const deviceId   = getDeviceId();
-      const userContext = getUserContext();
-      const result     = await startReview(webReviewTransport, text, {
-        deviceId,
-        userContext: userContext
-          ? {
-              breakupSummary: userContext.breakupSummary,
-              partnerName: userContext.partnerName ?? contact.name,
-              conversationContext: userContext.conversationContext,
-            }
-          : { partnerName: contact.name },
-      });
-      sessionId = result.sessionId;
-    } catch {
-      sessionId = `local_${Date.now()}`;
-    }
+  useEffect(() => () => { abortRef.current?.abort(); }, []);
 
-    const localSession: LocalSession = {
-      id: sessionId,
-      contactId,
-      timestamp: Date.now(),
-      messageAttempted: text,
-      outcome: "draft",
-    };
-    addSession(localSession);
-    refreshSessions();
-    setSending(false);
+  const send = useCallback(
+    async (text: string) => {
+      if (!text.trim() || status !== "idle" || !contactId || !contact) return;
+      setInput("");
+      setError(null);
 
-    const isLocal = sessionId.startsWith("local_");
-    setIntervention({
-      sessionId,
-      messageAttempted: text,
-      reply: "",
-      loading: true,
-      error: null,
-      actionLoading: false,
-    });
+      const userMsg: AIChatMessage = { role: "user", content: text };
+      const nextMessages = [...messages, userMsg];
+      setMessages(nextMessages);
 
-    if (isLocal) {
-      setIntervention((prev) =>
-        prev ? { ...prev, reply: CANNED_REPLY, loading: false } : null
-      );
-      return;
-    }
+      const deviceId = getDeviceId();
+      const stored = getUserContext();
+      const profile = getContactProfile(contactId);
 
-    const deviceId    = getDeviceId();
-    const userContext = getUserContext();
-    streamReviewResponse(
-      webReviewTransport,
-      sessionId,
-      text,
-      (chunk) => {
-        setIntervention((prev) =>
-          prev ? { ...prev, reply: prev.reply + chunk } : null
+      const userContext = {
+        ...stored,
+        partnerName: stored?.partnerName ?? contact.name,
+        breakupSummary: stored?.breakupSummary ?? profile?.breakupSummary,
+        noContactDays: stored?.noContactDays ?? profile?.noContactDays,
+      };
+
+      const partnerContext = {
+        partnerName: contact.name,
+        sampleMessages: profile?.sampleMessages,
+        relationshipMemory: profile?.relationshipMemory,
+      };
+
+      // Phase 1: Delivered — message sent, awaiting read receipt
+      setDeliveryStatus("delivered");
+
+      // Phase 2: Read — after a short human-feeling delay (0.8–2.5s)
+      const readDelay = 800 + Math.random() * 1700;
+      await sleep(readDelay);
+      setDeliveryStatus("read");
+
+      // Phase 3: Typing — realistic delay before they respond
+      const typingDelay = computeUiDelayMs(profile?.relationshipMemory);
+      await sleep(typingDelay);
+
+      setStatus("typing");
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+      try {
+        let fullReply = "";
+        await streamContactChatAPI(
+          nextMessages.map((m) => ({ role: m.role, content: m.content })),
+          partnerContext,
+          (chunk) => {
+            fullReply += chunk;
+            setMessages((prev) => {
+              const rest = prev.slice(0, -1);
+              return [...rest, { role: "assistant" as const, content: fullReply }];
+            });
+          },
+          { deviceId, userContext }
         );
-      },
-      {
-        deviceId,
-        userContext: userContext
-          ? {
-              breakupSummary: userContext.breakupSummary,
-              partnerName: userContext.partnerName ?? contact.name,
-              conversationContext: userContext.conversationContext,
-            }
-          : undefined,
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
+        setError(err instanceof Error ? err.message : "Something went wrong");
+        setMessages((prev) => [
+          ...prev.slice(0, -1),
+          {
+            role: "assistant" as const,
+            content: "couldn't connect. make sure the backend is running.",
+          },
+        ]);
+      } finally {
+        setStatus("idle");
+        setDeliveryStatus("none");
       }
-    )
-      .then(() => {
-        setIntervention((prev) => (prev ? { ...prev, loading: false } : null));
-      })
-      .catch((err) => {
-        setIntervention((prev) =>
-          prev
-            ? {
-                ...prev,
-                loading: false,
-                error: err instanceof Error ? err.message : "Something went wrong",
-                reply: prev.reply || CANNED_REPLY,
-              }
-            : null
-        );
-      });
-  }
+    },
+    [messages, status, contactId, contact]
+  );
 
-  async function handleOutcome(outcome: "intercepted" | "sent") {
-    if (!intervention || intervention.actionLoading) return;
-    setIntervention((prev) => (prev ? { ...prev, actionLoading: true } : null));
-    const { sessionId } = intervention;
-    try {
-      if (!sessionId.startsWith("local_")) {
-        await recordOutcome(webReviewTransport, sessionId, outcome);
-      }
-      updateLocalSessionOutcome(sessionId, outcome);
-    } catch {
-      updateLocalSessionOutcome(sessionId, outcome);
-    }
-    setIntervention(null);
-    refreshSessions();
-  }
-
-  function handleDeleteChat() {
+  function handleClear() {
     if (!contactId) return;
-    deleteSessionsForContact(contactId);
-    setShowDelete(false);
-    navigate("/", { replace: true });
+    clearContactAIChatHistory(contactId);
+    setMessages([]);
+    setShowClear(false);
+    setDeliveryStatus("none");
   }
 
-  if (!contactId || !contact) {
+  if (!contact || !contactId) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center p-6">
         <p className="text-[14px] text-muted-foreground">Contact not found.</p>
-        <Button variant="ghost" className="mt-2" onClick={() => navigate("/")}>
-          Back to Messages
-        </Button>
       </div>
     );
   }
 
-  const threadMessages = sessions
-    .filter((s) => s.messageAttempted)
-    .map((s) => ({
-      id: s.id,
-      text: s.messageAttempted,
-      outcome: s.outcome,
-      timestamp: s.timestamp,
-    }))
-    .sort((a, b) => a.timestamp - b.timestamp);
+  const isEmpty = messages.length === 0;
+  const loading = status !== "idle";
+
+  // Index of the last user message (to attach the receipt to)
+  const lastUserMsgIdx = messages.reduce<number>(
+    (acc, m, i) => (m.role === "user" ? i : acc),
+    -1
+  );
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    <div className="flex flex-col h-full bg-background">
 
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-10 flex flex-shrink-0 items-center h-14 gap-2 border-b border-border px-3 bg-background">
-        <Button
-          variant="ghost"
-          size="icon-sm"
+      {/* Header */}
+      <header className="flex-shrink-0 flex items-center h-14 border-b border-border px-3 gap-2">
+        <button
+          type="button"
           onClick={() => navigate("/")}
-          className="text-[#bf5af2] -ml-1"
+          className="flex items-center justify-center h-8 w-8 rounded-full hover:bg-secondary transition-colors text-[#bf5af2]"
+          aria-label="Back"
         >
           <ChevronLeft className="h-5 w-5" strokeWidth={2.5} />
-        </Button>
+        </button>
 
-        {/* Contact avatar + name */}
-        <div className="flex flex-1 items-center gap-2.5 min-w-0">
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#bf5af2]/15 text-[13px] font-semibold text-[#bf5af2]">
-            {contact.name.trim()[0]?.toUpperCase() ?? "?"}
-          </div>
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <ContactAvatar contact={contact} size="md" />
           <div className="min-w-0">
-            <p className="text-[15px] font-semibold text-foreground truncate leading-none">
+            <p className="text-[15px] font-semibold text-foreground leading-none truncate">
               {contact.name}
             </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Protected contact</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5 h-4">
+              {status === "typing" ? "typing…" : ""}
+            </p>
           </div>
         </div>
 
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => setShowDelete(true)}
-          className="text-muted-foreground hover:text-destructive"
+        {/* Closure shortcut */}
+        <button
+          type="button"
+          onClick={() => navigate(`/closure/${contactId}`)}
+          className="flex items-center justify-center h-8 w-8 rounded-full hover:bg-secondary transition-colors text-muted-foreground hover:text-[#bf5af2]"
+          aria-label="Closure conversation"
+          title="Talk for closure"
         >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+          <Heart className="h-4 w-4" />
+        </button>
+
+        {messages.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowClear(true)}
+            className="flex items-center justify-center h-8 w-8 rounded-full hover:bg-secondary transition-colors text-muted-foreground hover:text-destructive"
+            aria-label="Clear chat"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </header>
 
-      {/* ── Delete modal ── */}
-      {showDeleteConfirm && (
+      {/* Clear confirmation modal */}
+      {showClear && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-card border border-border p-5 shadow-xl animate-scale-in">
-            <p className="text-[15px] font-semibold text-foreground mb-1">Delete conversation?</p>
+          <div className="w-full max-w-sm rounded-2xl bg-card border border-border p-5 shadow-xl">
+            <p className="text-[15px] font-semibold text-foreground mb-1">Clear this chat?</p>
             <p className="text-[14px] text-muted-foreground">
-              This removes messages from this thread only.
+              This removes your conversation history with {contact.name}.
             </p>
             <div className="mt-5 flex gap-2.5">
-              <Button
-                variant="secondary"
-                className="flex-1"
-                onClick={() => setShowDelete(false)}
+              <button
+                type="button"
+                onClick={() => setShowClear(false)}
+                className="flex-1 rounded-lg border border-border py-2.5 text-[14px] font-medium text-foreground hover:bg-secondary transition-colors"
               >
                 Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                className="flex-1"
-                onClick={handleDeleteChat}
+              </button>
+              <button
+                type="button"
+                onClick={handleClear}
+                className="flex-1 rounded-lg bg-destructive py-2.5 text-[14px] font-medium text-destructive-foreground hover:opacity-90 transition-opacity"
               >
-                Delete
-              </Button>
+                Clear
+              </button>
             </div>
           </div>
         </div>
       )}
 
       <ChatWindow>
-        <div className="space-y-6">
-          {threadMessages.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-up">
-              <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-secondary mb-4 shadow-sm">
-                <Shield className="h-6 w-6 text-muted-foreground" strokeWidth={1.5} />
-              </div>
-              <p className="text-[16px] font-semibold text-foreground mb-1.5">Protected thread</p>
-              <p className="text-[14px] text-muted-foreground max-w-[260px] leading-relaxed">
-                Type what you want to send {contact.name}. We'll step in before it goes.
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate(`/closure/${contact.id}`)}
-                className="mt-6 flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <HeartCrack className="h-3.5 w-3.5" />
-                Get closure instead
-              </button>
+        {isEmpty ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <ContactAvatar contact={contact} size="2xl" className="mb-6" />
+            <p className="text-xl font-semibold text-foreground mb-1.5">
+              {contact.name}
+            </p>
+            <p className="text-[14px] text-muted-foreground max-w-[240px] leading-relaxed mb-8">
+              Say something. The AI will respond as {contact.name} based on your uploaded conversation.
+            </p>
+            <div className="flex flex-col gap-2 w-full max-w-xs">
+              {STARTERS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => send(s)}
+                  className="rounded-xl border border-border bg-background px-4 py-3 text-[14px] text-left text-foreground hover:bg-secondary transition-colors"
+                >
+                  {s}
+                </button>
+              ))}
             </div>
-          )}
-
-          {threadMessages.map((m) => (
-            <div
-              key={m.id}
-              className={cn(
-                "flex max-w-xl",
-                m.outcome === "sent" ? "ml-auto justify-end" : "justify-start"
-              )}
-            >
-              <div
-                className={cn(
-                  "rounded-xl px-4 py-3 text-[15px] leading-relaxed",
-                  m.outcome === "sent"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-foreground"
-                )}
-              >
-                <p className="leading-relaxed">{m.text}</p>
-                <div className="mt-1 flex items-center gap-1.5">
-                  {m.outcome !== "sent" && (
-                    <span className="text-[11px] opacity-70 italic">Not sent</span>
-                  )}
-                  <span className="text-[11px] opacity-70">
-                    {new Date(m.timestamp).toLocaleTimeString([], {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {intervention && (
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <div className="h-0.5 bg-primary" />
-              <div className="px-4 pt-3 pb-2 border-b border-border">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    NOTSENT
-                  </p>
-                </div>
-                <p className="text-[13px] text-muted-foreground">You were about to send:</p>
-                <p className="text-[14px] font-medium text-foreground mt-0.5">
-                  "{intervention.messageAttempted}"
-                </p>
-              </div>
-              <div className="px-4 py-3 min-h-[4rem]">
-                {intervention.loading && !intervention.reply && !liveReply ? (
-                  <div className="flex items-center gap-1.5">
-                    <span className="typing-dot opacity-60" />
-                    <span className="typing-dot opacity-60" />
-                    <span className="typing-dot opacity-60" />
-                  </div>
-                ) : (
-                  <p className="text-[15px] text-foreground whitespace-pre-wrap leading-relaxed">
-                    {liveReply ?? intervention.reply}
-                  </p>
-                )}
-                {intervention.error && (
-                  <p className="text-[13px] text-destructive mt-1">{intervention.error}</p>
-                )}
-                <div ref={threadEndRef} />
-              </div>
-              {!intervention.loading && (
-                <div className="flex gap-3 px-4 pb-4 pt-1">
-                  <Button
-                    onClick={() => handleOutcome("intercepted")}
-                    disabled={intervention.actionLoading}
-                    className="flex-1 rounded-lg bg-primary text-primary-foreground"
-                  >
-                    Won't send it
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleOutcome("sent")}
-                    disabled={intervention.actionLoading}
-                    className="flex-1 rounded-lg"
-                  >
-                    Send anyway
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        {!intervention && <div ref={threadEndRef} />}
+          </div>
+        ) : (
+          <>
+            {messages.map((m, i) => (
+              <MessageBubble
+                key={i}
+                role={m.role}
+                content={m.content}
+                loading={m.role === "assistant" && !m.content && loading}
+                deliveryStatus={
+                  m.role === "user" && i === lastUserMsgIdx && deliveryStatus !== "none"
+                    ? deliveryStatus
+                    : undefined
+                }
+              />
+            ))}
+          </>
+        )}
+        {error && (
+          <p className="text-[13px] text-destructive text-center px-4">{error}</p>
+        )}
+        <div ref={endRef} />
       </ChatWindow>
 
-      {error && (
-        <p className="px-4 py-1 text-[12px] text-destructive bg-background">{error}</p>
-      )}
       <InputBar
         value={input}
         onChange={setInput}
-        onSubmit={handleSend}
+        onSubmit={() => send(input.trim())}
         placeholder={`Message ${contact.name}…`}
-        disabled={sending}
+        disabled={loading}
       />
     </div>
   );

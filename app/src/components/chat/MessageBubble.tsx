@@ -1,22 +1,26 @@
 import { cn } from "@/lib/utils";
 
+export type DeliveryStatus = "delivered" | "read" | "none";
+
 export interface MessageBubbleProps {
   role: "user" | "assistant";
   content: string;
   /** Optional typing indicator when content is empty and loading */
   loading?: boolean;
+  /** iMessage-style delivery receipt shown below the last user bubble */
+  deliveryStatus?: DeliveryStatus;
   className?: string;
 }
 
 /**
  * Single message bubble: user right, AI left. Claude-style rounded-xl, max-w-xl.
  */
-export function MessageBubble({ role, content, loading, className }: MessageBubbleProps) {
+export function MessageBubble({ role, content, loading, deliveryStatus, className }: MessageBubbleProps) {
   return (
     <div
       className={cn(
-        "flex max-w-xl",
-        role === "user" ? "ml-auto justify-end" : "justify-start",
+        "flex flex-col max-w-xl",
+        role === "user" ? "ml-auto items-end" : "items-start",
         className
       )}
     >
@@ -29,7 +33,7 @@ export function MessageBubble({ role, content, loading, className }: MessageBubb
         )}
       >
         {loading && !content ? (
-          <div className="flex items-center gap-1.5 py-1">
+          <div className="flex items-center gap-1.5 py-1 px-1">
             <span className="typing-dot text-muted-foreground" />
             <span className="typing-dot text-muted-foreground" />
             <span className="typing-dot text-muted-foreground" />
@@ -38,6 +42,13 @@ export function MessageBubble({ role, content, loading, className }: MessageBubb
           <span className="whitespace-pre-wrap">{content}</span>
         )}
       </div>
+
+      {/* iMessage-style delivery receipt */}
+      {role === "user" && deliveryStatus && deliveryStatus !== "none" && (
+        <p className="text-[11px] text-muted-foreground mt-0.5 pr-0.5 animate-fade-in">
+          {deliveryStatus === "read" ? "Read" : "Delivered"}
+        </p>
+      )}
     </div>
   );
 }

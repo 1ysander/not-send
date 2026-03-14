@@ -3,21 +3,14 @@ export interface FlaggedContact {
   name: string;
   phoneNumber: string;
   dateAdded: number;
+  avatarUrl?: string;
 }
-
-export type SessionOutcome = "draft" | "intercepted" | "sent";
 
 export interface LocalSession {
   id: string;
   contactId: string;
   timestamp: number;
   messageAttempted: string;
-  outcome: SessionOutcome;
-}
-
-export interface Stats {
-  interceptionsCount: number;
-  messagesNeverSentCount: number;
 }
 
 export const STORAGE_KEYS = {
@@ -59,6 +52,9 @@ export interface RelationshipMemory {
   partnerTone: "warm" | "playful" | "distant" | "casual" | "anxious";
   partnerMessageCount: number;
   userMessageCount: number;
+  responseDelayProfile: "instant" | "quick" | "slow" | "unpredictable";
+  typicalDelaySeconds: number;
+  readsWithoutReplying: boolean;
 }
 
 /** For closure flow: simulate ex's voice. Sample messages from partner. */
@@ -66,6 +62,29 @@ export interface PartnerContext {
   partnerName: string;
   sampleMessages?: Array<{ fromPartner: boolean; text: string }>;
   relationshipMemory?: RelationshipMemory;
+}
+
+/** All per-contact context — breakup info + partner voice. This is the single editable "file" for each contact. */
+export interface ContactProfile {
+  /** What happened — used to personalise every AI prompt for this contact. */
+  breakupSummary?: string;
+  /** Days since last contact — used to frame urgency in interventions. */
+  noContactDays?: number;
+  /** Channel context so AI tone fits the medium. */
+  conversationContext?: ConversationContextType;
+  /** Sample messages from the partner (from iMessage upload). Used for closure voice simulation. */
+  sampleMessages?: Array<{ fromPartner: boolean; text: string }>;
+  /** Writing-style fingerprint extracted from uploaded conversation. */
+  relationshipMemory?: RelationshipMemory;
+  /** Epoch ms of last manual save. */
+  lastUpdated?: number;
+}
+
+/** One daily mood check-in entry. */
+export interface MoodEntry {
+  date: string;   // YYYY-MM-DD
+  score: number;  // 1–10
+  note?: string;  // optional free-text, max 50 words
 }
 
 /** A single message in an AI chat thread. */

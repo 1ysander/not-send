@@ -52,24 +52,31 @@ Breakupfix/
 ## Agent routing — read this first
 
 Before writing any code:
-1. Read `docs/agents/CRORR.md` — documented past mistakes. Every agent, every session.
-2. Load the relevant domain agent file below.
+1. Read `docs/BUILDPLAN.md` — master product vision, build phases, agent hierarchy.
+2. Read `docs/agents/CRORR.md` — documented past mistakes. Every agent, every session.
+3. Read `docs/agents/LEARN.md` — mistake-recording protocol. If you make or catch a mistake, log it here mid-session.
+4. Load the relevant domain agent file below.
 
 | Task domain | Load this file |
 |---|---|
 | Any frontend / React / UI / screens / routing | `docs/agents/FRONTEND.md` |
 | Chat UI — bubbles, streaming, interception overlay | `docs/agents/FRONTEND.md` + `docs/agents/sub/FRONTEND_CHAT.md` |
 | Upload flow, settings, stats, layout | `docs/agents/FRONTEND.md` + `docs/agents/sub/FRONTEND_SETTINGS.md` |
+| Login screen / Google OAuth / product routing | `docs/agents/FRONTEND.md` + `docs/agents/sub/FRONTEND_AUTH.md` |
 | Any backend / API / routes / AI prompts / engine | `docs/agents/BACKEND.md` |
 | AI prompts / model client / streaming / risk analysis | `docs/agents/BACKEND.md` + `docs/agents/sub/AI_ENGINE.md` |
 | iMessage parsing / file upload / data ingestion | `docs/agents/BACKEND.md` + `docs/agents/sub/DATA_INGESTION.md` |
+| Persona extraction / simulation / training loop / accuracy scoring | `docs/agents/BACKEND.md` + `docs/agents/PERSONA_ENGINE.md` |
+| Persona database schema / corrections / calibrations tables | `docs/agents/SUPABASE.md` + `docs/agents/sub/DATABASE_SCHEMA.md` + `docs/agents/PERSONA_ENGINE.md` |
 | Interception pipeline / middleware chain | `docs/agents/BACKEND.md` + `docs/agents/sub/INTERCEPTION_PIPELINE.md` |
 | Database / auth / persistence / Supabase migration | `docs/agents/SUPABASE.md` |
 | Supabase schema design / RLS / migration files | `docs/agents/SUPABASE.md` + `docs/agents/sub/DATABASE_SCHEMA.md` |
+| Marketing website / landing page | `docs/agents/WEBSITE.md` |
 | E2E tests / Playwright / test coverage | `docs/agents/PLAYWRIGHT.md` |
 | Code cleanup / dead code / refactor / consolidation | `docs/agents/REFACTOR.md` |
 | Roadmap / task tracking / Notion sync | `docs/agents/NOTION.md` |
-| Agent made a mistake / user corrected direction | `docs/agents/CRORR.md` |
+| Agent made a mistake / user corrected direction | `docs/agents/CRORR.md` + `docs/agents/LEARN.md` |
+| Bug found / broken feature / build error / runtime crash | `docs/agents/sub/DEBUGGER.md` |
 | Product idea or core mechanic is changing | `docs/agents/PRODUCT_PIVOT.md` |
 | Multi-agent coordination / parallel execution | `docs/agents/ORCHESTRATION.md` |
 
@@ -82,58 +89,89 @@ For cross-cutting tasks (e.g. adding a new feature end-to-end), load both `FRONT
 ### Frontend (`app/src/`)
 
 ```
-App.tsx                          ← route tree, guards
-main.tsx                         ← entry, providers
-types.ts                         ← ALL frontend types (single source)
-api.ts                           ← ALL backend calls (single source)
-lib/storage.ts                   ← ALL localStorage access (single source)
-lib/utils.ts                     ← cn() and shared helpers
+App.tsx                               ← route tree, AuthGuard, PublicOnboardingOnly guards
+main.tsx                              ← entry, providers
+types.ts                              ← ALL frontend types (single source of truth)
+api.ts                                ← ALL backend calls (single source); re-exports types from types.ts
+lib/storage.ts                        ← ALL localStorage access (single source)
+lib/utils.ts                          ← cn() and shared helpers
 screens/
-  Home/HomeScreen                ← landing page / hero with upload CTA
-  Upload/UploadScreen            ← file picker + upload + parse progress
-  Chat/ChatScreen                ← parsed conversation view + "Intercept" / "Talk to [name]" actions
-  Intervention/InterventionChat  ← AI intervention on a draft message (full-screen, no nav)
-  Closure/ClosureScreen          ← AI plays the ex's voice (full-screen, no nav)
-  AIChat/AIChatScreen            ← general support chat
-  Stats/StatsScreen              ← messages intercepted / never sent
-  Settings/SettingsScreen        ← breakup context, uploaded conversation management
-  Login/LoginScreen              ← Google OAuth (future)
+  Chat/ChatScreen.tsx                 ← AI persona chat per contact (/chat/:contactId)
+  Chat/WelcomeView.tsx                ← empty-state welcome shown at index route
+  Chat/ConversationList.tsx           ← contact list for sidebar / mobile
+  Chat/ConversationSidebar.tsx        ← desktop sidebar conversation list
+  Chat/ChatLayout.tsx                 ← layout wrapper for chat views
+  Chat/ChatEmpty.tsx                  ← no-contact empty state
+  Closure/ClosureScreen.tsx           ← AI plays ex's voice, free closure chat (/closure/:contactId)
+  AIChat/AIChatScreen.tsx             ← general AI support chat (/ai-chat)
+  Contacts/ContactsScreen.tsx         ← add / browse contacts (/contacts)
+  Contacts/ContactProfileScreen.tsx   ← per-contact detail + profile edit (/contacts/:contactId)
+  Stats/StatsScreen.tsx               ← mood check-in heatmap + total messages sent (/stats)
+  Settings/SettingsScreen.tsx         ← app settings (/settings)
+  Login/LoginScreen.tsx               ← Google OAuth (/login)
+  Onboarding/AddContactScreen.tsx     ← onboarding step 1: add first contact (/onboarding)
+  Onboarding/YoureSetScreen.tsx       ← onboarding step 2: confirmation (/onboarding/set)
+  Conversations/ManageConversationsScreen.tsx  ← DEAD — file exists but unlinked (no route, no nav)
 components/
-  AppShell.tsx                   ← tab bar + outlet
-  ui/                            ← shadcn/ui primitives only
+  AppShell.tsx                        ← sidebar + mobile bottom nav (4 tabs: Chats, Contacts, Stats, Settings)
+  ContactAvatar.tsx                   ← contact avatar with initials fallback
+  PageLayout.tsx                      ← standard page wrapper with title
+  layout/Layout.tsx                   ← desktop 2-column layout (sidebar + main)
+  ui/Sidebar.tsx                      ← sidebar shell
+  ui/                                 ← shadcn/ui primitives only
+  chat/ChatWindow.tsx                 ← scrollable message area
+  chat/InputBar.tsx                   ← message input + send button
+  chat/MessageBubble.tsx              ← single message bubble (user/assistant)
+context/
+  AuthContext.tsx                     ← Google OAuth state (Supabase auth)
 contexts/
-  ConversationSocketContext.tsx  ← socket.io client provider
+  ConversationSocketContext.tsx       ← socket.io client provider
 ```
+
+### Active routes
+
+| Path | Screen | Notes |
+|---|---|---|
+| `/` | `WelcomeView` / `Page` | Index; shows contact list |
+| `/contacts` | `ContactsScreen` | Add/browse contacts |
+| `/contacts/:contactId` | `ContactProfileScreen` | Contact detail |
+| `/chat/:contactId` | `ChatScreen` | AI persona chat |
+| `/closure/:contactId` | `ClosureScreen` | Closure chat (AI as ex) |
+| `/ai-chat` | `AIChatScreen` | General support chat |
+| `/stats` | `StatsScreen` | Mood heatmap + message count |
+| `/settings` | `SettingsScreen` | App settings |
+| `/login` | `LoginScreen` | Auth |
+| `/onboarding` | `AddContactScreen` | Onboarding step 1 |
+| `/onboarding/set` | `YoureSetScreen` | Onboarding step 2 |
 
 ### Backend (`backend/src/`)
 
 ```
 index.ts                         ← Express entry, CORS, rate limit, route mount
-socket.ts                        ← socket.io server instance
-store.ts                         ← in-memory state (sessions, history, context)
+store.ts                         ← in-memory state (sessions, history, context) — dev/MVP only
 types.ts                         ← ALL backend types (single source)
 routes/
   session.ts                     ← POST /api/session, PATCH /api/session/:id
-  chat.ts                        ← POST /api/chat (intervention), /chat/closure, /chat/support
+  chat.ts                        ← POST /api/chat, /chat/closure, /chat/support, /chat/contact
   context.ts                     ← PUT/GET /api/context/user, /context/partner
-  stats.ts                       ← GET /api/stats
+  stats.ts                       ← GET /api/stats → { sessionCount, totalMessages }
   parse.ts                       ← POST /api/parse-imessage (multipart, iMessage .txt parser)
   engine.ts                      ← engine control routes
+  persona.ts                     ← GET/POST /api/persona (persona extraction + simulation)
 engine/
-  conversationEngine.ts          ← streamIntervention, streamClosure, streamSupport
-  riskAnalysis.ts
+  conversationEngine.ts          ← streamIntervention, streamClosure, streamSupport, streamContactChat
   imessageParser.ts              ← parseIMExport(buffer) → { partnerName, sampleMessages[], history[] }
-  sendController.ts
-  creditUsage.ts
+  memoryBuilder.ts               ← builds RelationshipMemory from parsed conversation
+  creditUsage.ts                 ← per-device credit tracking
+  persona/                       ← persona extraction + simulation sub-engine
 ai/
-  model.ts                       ← Anthropic client + model config
-  run-prompt.ts                  ← streaming helper
+  model.ts                       ← Anthropic client + model config (claude-sonnet-4-6)
   config.ts
 prompts/
   intervention.ts                ← buildInterventionSystemPrompt()
   closure.ts                     ← buildClosureSystemPrompt()
-connectors/
-  imessage.ts
+  support.ts                     ← buildSupportSystemPrompt()
+  contactChat.ts                 ← buildContactChatSystemPrompt() — AI persona chat
 ```
 
 ---
@@ -147,7 +185,7 @@ connectors/
 5. **TypeScript everywhere.** No `.js` logic files. All new files are `.ts` or `.tsx`.
 6. **ESM only on backend.** `"type": "module"` in `backend/package.json`. All imports use `.js` extension (TypeScript ESM convention).
 7. **Streaming AI responses.** All AI chat endpoints return `text/event-stream` SSE. Never use non-streaming for chat.
-8. **No auth bypass.** The `OnboardingGuard` in `App.tsx` gates all main app routes. Never remove or weaken it.
+8. **No auth bypass.** `AuthGuard` and `PublicOnboardingOnly` in `App.tsx` gate all main app routes. Never remove or weaken them.
 9. **Mobile-first UI.** The app is mobile-first. Never design for desktop-first layouts. Max width containers, tab navigation, full-bleed screens.
 10. **No in-memory state in production.** The current `store.ts` Map-based state is dev/MVP only. All persistence work targets Supabase.
 
@@ -171,35 +209,43 @@ connectors/
 
 ## Data flow (canonical)
 
-### Upload flow (entry point for personal app)
+### Contact chat flow (primary flow — current)
 ```
-User lands on homepage
-  → clicks "Upload your conversation"
-  → selects iMessage .txt export file
-  → POST /api/parse-imessage (multipart) → backend parses .txt
-  → returns { partnerName, messageCount, sampleMessages[], conversationHistory[] }
-  → stored in localStorage via setPartnerContextLocal() + setConversationHistoryLocal()
-  → navigate to /chat — user sees parsed conversation summary
-```
-
-### Intervention flow (user has a message they want to send)
-```
-User types draft on /chat → hits "Intercept"
-  → POST /api/session → sessionId stored in sessionStorage
-  → navigate to /intervention
-  → InterventionChat reads sessionStorage → POST /api/chat (SSE stream)
-  → backend builds system prompt (intervention.ts) with uploadedContext + history
-  → stream to UI → user picks "I won't send it" (intercepted) or "Send anyway" (sent)
-  → PATCH /api/session/:id → updateLocalSessionOutcome() → back to /chat
+User adds a contact (onboarding or /contacts)
+  → contact stored in localStorage via addFlaggedContact()
+  → navigate to /chat/:contactId
+  → ChatScreen loads contact profile (getContactProfile) + AI chat history (getContactAIChatHistory)
+  → user sends message → POST /api/chat/contact (SSE)
+  → backend uses buildContactChatSystemPrompt() with partnerContext + relationshipMemory
+  → AI responds as the contact's persona with realistic delay simulation
+  → response streamed to UI and persisted via setContactAIChatHistory()
 ```
 
 ### Closure flow
 ```
-User clicks "Talk to [name]" on /chat
-  → navigate to /closure
+User taps Heart icon in ChatScreen header
+  → navigate to /closure/:contactId
   → ClosureScreen reads partnerContext from localStorage
   → POST /api/chat/closure (SSE) with partnerContext (sample messages from upload)
   → AI plays the ex's voice — free chat toward closure
+```
+
+### Intervention flow (available, not primary nav)
+```
+User has a message they want to send
+  → POST /api/session → sessionId stored in sessionStorage
+  → POST /api/chat (SSE stream) with message
+  → backend builds prompt (intervention.ts) to talk them through the impulse
+  → PATCH /api/session/:id → outcome recorded
+```
+
+### iMessage upload flow (feeds persona quality)
+```
+User uploads iMessage .txt export (via Settings or onboarding)
+  → POST /api/parse-imessage (multipart)
+  → backend parseIMExport() + memoryBuilder → { partnerName, sampleMessages[], relationshipMemory }
+  → stored to contact profile via setContactProfile()
+  → relationshipMemory feeds persona tone, delay, and style in all subsequent chats
 ```
 
 ---
@@ -228,7 +274,7 @@ SUPABASE_SERVICE_KEY=<key> # when migrated
 - Streaming: yes (SSE)
 - Max tokens: 1024 per response
 - History cap: last 10 turns per session (token cost control)
-- Prompt files: `backend/src/prompts/intervention.ts`, `backend/src/prompts/closure.ts`
+- Prompt files: `backend/src/prompts/intervention.ts`, `backend/src/prompts/closure.ts`, `backend/src/prompts/support.ts`, `backend/src/prompts/contactChat.ts`
 - Never hardcode the model string outside `backend/src/ai/model.ts`
 
 ---

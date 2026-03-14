@@ -1,11 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import { Bot, Plus, MessageCircle } from "lucide-react";
+import { Plus, MessageCircle, Bot } from "lucide-react";
 import { getFlaggedContacts, getSessionsForContact } from "@/lib/storage";
-import { cn } from "@/lib/utils";
-
-function getInitial(name: string): string {
-  return name.trim() ? name.trim()[0].toUpperCase() : "?";
-}
+import { ContactAvatar } from "@/components/ContactAvatar";
 
 function formatTime(ts: number): string {
   const now = Date.now();
@@ -15,19 +11,6 @@ function formatTime(ts: number): string {
   if (diff < 86_400_000)
     return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   return new Date(ts).toLocaleDateString([], { month: "short", day: "numeric" });
-}
-
-const AVATAR_BG = [
-  "bg-rose-100 text-rose-700",
-  "bg-violet-100 text-violet-700",
-  "bg-sky-100 text-sky-700",
-  "bg-amber-100 text-amber-700",
-  "bg-emerald-100 text-emerald-700",
-];
-
-function avatarColor(name: string): string {
-  const code = name.trim().charCodeAt(0) || 0;
-  return AVATAR_BG[code % AVATAR_BG.length];
 }
 
 /**
@@ -110,7 +93,7 @@ export function WelcomeView() {
       </div>
 
       {/* Conversation list */}
-      <ul className="flex-1 overflow-y-auto divide-y divide-border/50">
+      <ul className="overflow-y-auto divide-y divide-border/50">
         {rows.map(({ contact, last }) => {
           const preview = last?.messageAttempted?.slice(0, 50) ?? "Tap to start";
           return (
@@ -120,14 +103,7 @@ export function WelcomeView() {
                 onClick={() => navigate(`/chat/${contact.id}`)}
                 className="flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-secondary/60 transition-colors active:bg-secondary"
               >
-                <div
-                  className={cn(
-                    "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-[15px] font-semibold",
-                    avatarColor(contact.name)
-                  )}
-                >
-                  {getInitial(contact.name)}
-                </div>
+                <ContactAvatar contact={contact} size="xl" />
                 <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-medium text-foreground truncate leading-snug">
                     {contact.name}
@@ -147,8 +123,8 @@ export function WelcomeView() {
         })}
       </ul>
 
-      {/* AI chat shortcut at the bottom */}
-      <div className="px-4 py-3 border-t border-border">
+      {/* AI Support chat shortcut */}
+      <div className="flex-shrink-0 px-4 py-3 border-t border-border">
         <button
           type="button"
           onClick={() => navigate("/ai-chat")}
