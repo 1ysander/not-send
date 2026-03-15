@@ -279,11 +279,12 @@ export async function streamContactChatAPI(
   messages: { role: string; content: string }[],
   partnerContext: PartnerContext,
   onChunk: (text: string) => void,
-  options?: { userContext?: UserContext; deviceId?: string }
+  options?: { userContext?: UserContext; deviceId?: string; conversationId?: string }
 ): Promise<void> {
   const body: Record<string, unknown> = { messages, partnerContext };
   if (options?.userContext) body.userContext = options.userContext;
   if (options?.deviceId) body.deviceId = options.deviceId;
+  if (options?.conversationId) body.conversationId = options.conversationId;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
   const res = await fetch(`${API_BASE}/chat/contact`, {

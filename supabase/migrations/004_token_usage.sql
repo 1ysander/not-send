@@ -5,7 +5,7 @@ create table public.token_usage (
   id bigserial primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
   session_id text,
-  mode text not null check (mode in ('intervention', 'closure', 'support')),
+  mode text not null check (mode in ('intervention', 'closure', 'support', 'contact')),
   model text not null,
   input_tokens integer not null,
   output_tokens integer not null,

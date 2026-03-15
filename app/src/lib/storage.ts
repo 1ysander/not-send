@@ -1,4 +1,8 @@
 import type { FlaggedContact, LocalSession, UserContext, PartnerContext, AIChatMessage, ContactProfile, MoodEntry } from "../types";
+import { supabase, supabaseEnabled } from "./supabase";
+
+// Re-export for consumers
+export { supabaseEnabled };
 
 const FLAGGED_KEY = "notsent_flaggedContacts";
 const SESSIONS_KEY = "notsent_sessions";
@@ -316,4 +320,160 @@ export function setProductMode(mode: ProductMode): void {
 
 export function clearProductMode(): void {
   localStorage.removeItem(PRODUCT_MODE_KEY);
+}
+
+// ─── Remote: Contacts ─────────────────────────────────────────────────────────
+
+export async function addFlaggedContactRemote(
+  contact: Omit<FlaggedContact, "id" | "dateAdded">
+): Promise<FlaggedContact> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not authenticated");
+  const { data, error } = await supabase
+    .from("flagged_contacts")
+    .insert({ user_id: session.user.id, name: contact.name, phone_number: contact.phoneNumber })
+    .select()
+    .single();
+  if (error) throw error;
+  const local: FlaggedContact = {
+    id: data.id,
+    name: data.name,
+    phoneNumber: data.phone_number,
+    dateAdded: new Date(data.date_added).getTime(),
+  };
+  // Keep localStorage in sync as cache
+  const contacts = getFlaggedContacts();
+  contacts.push(local);
+  setFlaggedContacts(contacts);
+  return local;
+}
+
+export async function getFlaggedContactsRemote(): Promise<FlaggedContact[]> {
+  const { data, error } = await supabase
+    .from("flagged_contacts")
+    .select()
+    .order("date_added", { ascending: true });
+  if (error) throw error;
+  const contacts = (data as Array<{ id: string; name: string; phone_number: string; date_added: string }>).map((row) => ({
+    id: row.id,
+    name: row.name,
+    phoneNumber: row.phone_number,
+    dateAdded: new Date(row.date_added).getTime(),
+  }));
+  // Sync cache
+  setFlaggedContacts(contacts);
+  return contacts;
+}
+
+export async function removeFlaggedContactRemote(id: string): Promise<void> {
+  const { error } = await supabase.from("flagged_contacts").delete().eq("id", id);
+  if (error) throw error;
+  setFlaggedContacts(getFlaggedContacts().filter((c) => c.id !== id));
+  deleteContactProfile(id);
+}
+
+// ─── Remote: Chat history ─────────────────────────────────────────────────────
+
+export async function getContactAIChatHistoryRemote(contactId: string): Promise<AIChatMessage[]> {
+  const { data, error } = await supabase
+    .from("contact_ai_chat_history")
+    .select("role, content")
+    .eq("contact_id", contactId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data as Array<{ role: "user" | "assistant"; content: string }>).map((row) => ({
+    role: row.role,
+    content: row.content,
+  }));
+}
+
+export async function appendContactAIChatMessageRemote(
+  contactId: string,
+  msg: AIChatMessage
+): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not authenticated");
+  const { error } = await supabase.from("contact_ai_chat_history").insert({
+    user_id: session.user.id,
+    contact_id: contactId,
+    role: msg.role,
+    content: msg.content,
+  });
+  if (error) throw error;
+}
+
+export async function clearContactAIChatHistoryRemote(contactId: string): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return;
+  await supabase
+    .from("contact_ai_chat_history")
+    .delete()
+    .eq("contact_id", contactId)
+    .eq("user_id", session.user.id);
+}
+
+// ─── Remote: Mood log ─────────────────────────────────────────────────────────
+
+export async function logMoodRemote(score: number, note?: string, journal?: string): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not authenticated");
+  const today = new Date().toISOString().slice(0, 10);
+  const payload: Record<string, unknown> = { user_id: session.user.id, date: today, score };
+  if (note !== undefined) payload.note = note;
+  if (journal !== undefined) payload.journal = journal;
+  const { error } = await supabase
+    .from("mood_log")
+    .upsert(payload, { onConflict: "user_id,date" });
+  if (error) throw error;
+}
+
+export async function getMoodLogRemote(): Promise<MoodEntry[]> {
+  const { data, error } = await supabase
+    .from("mood_log")
+    .select("date, score, note, journal")
+    .order("date", { ascending: true });
+  if (error) throw error;
+  return (data as Array<{ date: string; score: number; note?: string | null; journal?: string | null }>).map((row) => ({
+    date: row.date,
+    score: row.score,
+    ...(row.note ? { note: row.note } : {}),
+    ...(row.journal ? { journal: row.journal } : {}),
+  }));
+}
+
+// ─── Remote: Contact profile ──────────────────────────────────────────────────
+
+export async function getContactProfileRemote(contactId: string): Promise<ContactProfile> {
+  const { data, error } = await supabase
+    .from("partner_contexts")
+    .select("sample_messages")
+    .eq("contact_id", contactId)
+    .maybeSingle();
+  if (error || !data) return getContactProfile(contactId);
+  // Merge remote sample_messages with local profile fields
+  const local = getContactProfile(contactId);
+  return { ...local, sampleMessages: data.sample_messages };
+}
+
+export async function setContactProfileRemote(
+  contactId: string,
+  profile: ContactProfile
+): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not authenticated");
+  const contact = getFlaggedContacts().find((c) => c.id === contactId);
+  if (!contact) return;
+  const { error } = await supabase.from("partner_contexts").upsert(
+    {
+      user_id: session.user.id,
+      contact_id: contactId,
+      partner_name: contact.name,
+      sample_messages: profile.sampleMessages ?? [],
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,contact_id" }
+  );
+  if (error) throw error;
+  // Keep localStorage as cache
+  setContactProfile(contactId, profile);
 }

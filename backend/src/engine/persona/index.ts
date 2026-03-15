@@ -13,3 +13,5 @@ export { personaStore, getPersonaByContact, getPersonaById, contactPersonaIndex 
 export type { PersonaProfile, PersonaJSON, SimulatedResponse, CorrectionType, CalibrationPair, AccuracyScore } from "./models/PersonaTypes.js";
 export type { ContextSignals } from "./models/ContextSignals.js";
 export type { PersonaSimulator } from "./simulation/PersonaSimulator.js";
+export type { UnifiedPsychProfile } from "./models/UnifiedPsychTypes.js";
+export { runUnifiedExtraction } from "./extraction/unifiedExtractor.js";

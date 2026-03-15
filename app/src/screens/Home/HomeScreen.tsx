@@ -104,7 +104,7 @@ export function HomeScreen() {
               data-testid="hero-upload-cta"
               className="w-full sm:w-auto min-h-[52px] px-8 text-base font-semibold rounded-2xl text-white"
               style={{ backgroundColor: "#bf5af2" }}
-              onClick={() => navigate("/login")}
+              onClick={() => navigate("/upload")}
             >
               Upload your conversation
             </Button>
@@ -171,7 +171,7 @@ export function HomeScreen() {
                 color: "#f5f5f5",
                 backgroundColor: "transparent",
               }}
-              onClick={() => navigate("/login")}
+              onClick={() => navigate("/upload")}
             >
               Get started — it's free
             </Button>

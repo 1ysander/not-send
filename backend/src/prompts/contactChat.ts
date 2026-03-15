@@ -10,7 +10,8 @@ import type { UserContext, PartnerContext } from "../types.js";
  */
 export function buildContactChatSystemPrompt(
   partnerContext: PartnerContext,
-  userContext?: UserContext
+  userContext?: UserContext,
+  memoryContextBlock?: string
 ): string {
   const name = partnerContext.partnerName;
   const mem = partnerContext.relationshipMemory;
@@ -87,6 +88,10 @@ ${mem.recurringTopics.length ? `- Topics you two talked about: ${mem.recurringTo
     ? `\n\nNo conversation history was uploaded, so respond as a realistic person would text: casual, brief, natural. Match whatever energy and style the user sets.`
     : "";
 
+  const memoryBlock = memoryContextBlock?.trim()
+    ? `\n\n${memoryContextBlock}`
+    : "";
+
   return `You are ${name}. Not a simulation of ${name}. Not an AI playing ${name}. You are ${name}, texting on your phone, like you always do.
 
 HARD RULES — no exceptions:
@@ -98,5 +103,5 @@ HARD RULES — no exceptions:
 - Never write a paragraph if ${name} sent one-liners
 - Never break character if they push back — ${name} would deflect, joke, or go quiet; do that
 - If you don't know something, respond the way ${name} would: short deflection, a joke, "idk" — whatever fits
-- The sample messages and style rules below are your source of truth${styleBlock}${samplesBlock}${contextNote}${noMemoryFallback}`;
+- The sample messages and style rules below are your source of truth${styleBlock}${samplesBlock}${contextNote}${noMemoryFallback}${memoryBlock}`;
 }

@@ -1,14 +1,11 @@
 /**
  * AnthropicSimulator — Tier 1 implementation of PersonaSimulator.
- * Uses the existing multi-provider streamChat() from ai/model.ts.
+ * Now delegates to StyleEngine (2-pass: StyleEnforcer + EmotionalCalibrator).
  * Swap this for SelfHostedSimulator in Tier 2 without touching any route code.
  */
 
-import { streamChat } from "../../../ai/model.js";
-import { buildSimulationSystemPrompt } from "./systemPromptBuilder.js";
+import { styleEngine } from "./StyleEngine.js";
 import { detectContextSignals } from "./contextInjector.js";
-import { trimConversationHistory } from "./conversationManager.js";
-import { postProcess } from "./responsePostProcessor.js";
 import type { PersonaSimulator, StreamCallback } from "./PersonaSimulator.js";
 import type { PersonaProfile, SimulatedResponse } from "../models/PersonaTypes.js";
 import type { ContextSignals } from "../models/ContextSignals.js";
@@ -20,38 +17,43 @@ export class AnthropicSimulator implements PersonaSimulator {
     signals: ContextSignals,
     onChunk: StreamCallback
   ): Promise<SimulatedResponse> {
-    const personaJson = persona.personaJson;
+    // Run the two-pass StyleEngine pipeline
+    const result = await styleEngine.generate(persona, conversationHistory);
 
-    // Build dynamic system prompt with current context signals
-    const systemPrompt = buildSimulationSystemPrompt(personaJson, signals);
-
-    // Trim history to token budget
-    const trimmedHistory = trimConversationHistory(conversationHistory);
-
-    // Stream the response
-    const parts: string[] = [];
-    await streamChat(
-      {
-        systemPrompt,
-        messages: trimmedHistory,
-        maxTokens: 512, // persona responses are short
-      },
-      (chunk) => {
-        parts.push(chunk);
-        onChunk(chunk);
-      }
-    );
-
-    const rawResponse = parts.join("");
-
-    // Apply style guardrails
-    const { messages, driftDetected, driftReasons } = postProcess(rawResponse, personaJson);
-
-    if (driftDetected) {
-      console.warn(`[AnthropicSimulator] Style drift for persona "${persona.targetName}":`, driftReasons);
+    if (result.messages.length === 0) {
+      // No-reply: signal silence to the caller
+      const silenceText = "";
+      onChunk(silenceText);
+      return {
+        messages: [],
+        rawResponse: "",
+        messageDelays: [],
+      };
     }
 
-    return { messages, rawResponse };
+    // Stream message text to caller (first message only for live streaming)
+    // Delay simulation happens client-side using messageDelays
+    const firstMessage = result.messages[0].text;
+    onChunk(firstMessage);
+
+    // For multi-message (double text), emit subsequent messages after first
+    for (let i = 1; i < result.messages.length; i++) {
+      onChunk(`[SPLIT]${result.messages[i].text}`);
+    }
+
+    const allText = result.messages.map((m) => m.text).join("[SPLIT]");
+
+    if (result.retried) {
+      console.info(
+        `[AnthropicSimulator] Retried generation for "${persona.targetName}" — flags: ${result.calibration.flags.join(", ")}`
+      );
+    }
+
+    return {
+      messages: result.messages.map((m) => m.text),
+      rawResponse: allText,
+      messageDelays: result.messages.map((m) => m.delay_seconds),
+    };
   }
 }
 

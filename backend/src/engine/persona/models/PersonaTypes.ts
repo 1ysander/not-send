@@ -178,6 +178,8 @@ export interface PersonaProfile {
   correctionCount: number;
   accuracyStage: 1 | 2 | 3 | 4;
   accuracyScore?: number;
+  /** Unified psychological profile (9-section). Populated when GROQ_API_KEY is set. */
+  unifiedPsych?: import("./UnifiedPsychTypes.js").UnifiedPsychProfile;
   createdAt: number;
   updatedAt: number;
 }
@@ -185,8 +187,9 @@ export interface PersonaProfile {
 // ─── Simulation types ────────────────────────────────────────────────────────
 
 export interface SimulatedResponse {
-  messages: string[];    // split on [SPLIT] — may be 1 or more bubbles
+  messages: string[];         // split on [SPLIT] — may be 1 or more bubbles
   rawResponse: string;
+  messageDelays?: number[];   // delay_seconds for each bubble (from StyleEngine)
 }
 
 // ─── Training / feedback types ───────────────────────────────────────────────

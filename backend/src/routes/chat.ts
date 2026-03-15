@@ -70,7 +70,7 @@ chatRoutes.post("/closure", async (req, res) => {
   let partnerContext = bodyPartnerContext;
   if (!partnerContext?.partnerName && typeof deviceId === "string") {
     const { getPartnerContextByDevice } = await import("../engine/conversationEngine.js");
-    partnerContext = getPartnerContextByDevice(deviceId);
+    partnerContext = await getPartnerContextByDevice(deviceId);
   }
   if (!partnerContext?.partnerName) {
     res.status(400).json({
@@ -136,7 +136,7 @@ chatRoutes.post("/compliance", (_req, res) => {
 
 /** Contact chat: AI fully adopts the contact's texting style (learned from uploaded conversation). */
 chatRoutes.post("/contact", async (req, res) => {
-  const { messages, partnerContext: bodyPartnerContext, userContext: bodyUserContext, deviceId } = req.body ?? {};
+  const { messages, partnerContext: bodyPartnerContext, userContext: bodyUserContext, deviceId, conversationId } = req.body ?? {};
 
   if (!Array.isArray(messages) || messages.length === 0) {
     res.status(400).json({ error: "messages (array) is required" });
@@ -146,7 +146,7 @@ chatRoutes.post("/contact", async (req, res) => {
   let partnerContext = bodyPartnerContext;
   if (!partnerContext?.partnerName && typeof deviceId === "string") {
     const { getPartnerContextByDevice } = await import("../engine/conversationEngine.js");
-    partnerContext = getPartnerContextByDevice(deviceId);
+    partnerContext = await getPartnerContextByDevice(deviceId);
   }
   if (!partnerContext?.partnerName) {
     res.status(400).json({ error: "partnerContext.partnerName is required" });
@@ -160,7 +160,7 @@ chatRoutes.post("/contact", async (req, res) => {
 
   try {
     await streamContactChat(
-      { messages, partnerContext, userContext: bodyUserContext, deviceId },
+      { messages, partnerContext, userContext: bodyUserContext, deviceId, conversationId },
       (text) => res.write(`data: ${JSON.stringify({ text })}\n\n`)
     );
   } catch (err) {

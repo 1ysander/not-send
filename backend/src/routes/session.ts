@@ -8,12 +8,17 @@ import type { UserContext } from "../types.js";
 
 export const sessionRoutes = Router();
 
-sessionRoutes.post("/", (req, res) => {
-  const { messageAttempted, userContext, deviceId } = req.body ?? {};
+sessionRoutes.post("/", async (req, res) => {
+  const { messageAttempted, userContext, deviceId, userId } = req.body ?? {};
   if (typeof messageAttempted !== "string" || !messageAttempted.trim()) {
     res.status(400).json({ error: "messageAttempted is required" });
     return;
   }
+  // userId (Supabase auth UUID) takes precedence; fall back to deviceId for dev/legacy
+  const effectiveId: string | undefined =
+    (typeof userId === "string" ? userId : undefined) ??
+    (typeof deviceId === "string" ? deviceId : undefined);
+
   const uc: UserContext | undefined =
     userContext && typeof userContext === "object"
       ? {
@@ -21,19 +26,30 @@ sessionRoutes.post("/", (req, res) => {
           partnerName: userContext.partnerName,
         }
       : undefined;
-  if (deviceId && typeof deviceId === "string" && uc) {
-    setUserContext(deviceId, uc);
+
+  if (effectiveId && uc) {
+    await setUserContext(effectiveId, uc);
   }
-  const session = createSession(messageAttempted.trim(), uc, deviceId);
-  res.status(201).json({ sessionId: session.id });
+
+  try {
+    const session = await createSession(messageAttempted.trim(), uc, effectiveId);
+    res.status(201).json({ sessionId: session.id });
+  } catch (err) {
+    console.error("createSession error:", err);
+    res.status(500).json({ error: "Failed to create session" });
+  }
 });
 
-
-sessionRoutes.get("/:id", (req, res) => {
-  const session = getSession(req.params.id);
-  if (!session) {
-    res.status(404).json({ error: "Session not found" });
-    return;
+sessionRoutes.get("/:id", async (req, res) => {
+  try {
+    const session = await getSession(req.params.id);
+    if (!session) {
+      res.status(404).json({ error: "Session not found" });
+      return;
+    }
+    res.json(session);
+  } catch (err) {
+    console.error("getSession error:", err);
+    res.status(500).json({ error: "Failed to fetch session" });
   }
-  res.json(session);
 });

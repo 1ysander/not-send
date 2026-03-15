@@ -14,6 +14,12 @@ const INTERVENTION_MODEL_OPENAI = "gpt-4o-mini";
 const INTERVENTION_MODEL_GEMINI = "gemini-2.0-flash";
 const INTERVENTION_MODEL_GROQ = "llama-3.1-8b-instant";
 
+export interface StreamChatUsage {
+  inputTokens: number;
+  outputTokens: number;
+  model: string;
+}
+
 /**
  * Stream a reply using the configured provider (Anthropic, OpenAI, or canned).
  * onChunk is called with each piece of text; use for SSE or live UI later.
@@ -25,9 +31,11 @@ export async function streamChat(
     maxTokens?: number;
     /** If set, used for canned reply when no keys (e.g. messageAttempted for intervention). */
     messageAttempted?: string;
+    /** Override the Anthropic model (e.g. use Haiku for lightweight passes). */
+    model?: string;
   },
   onChunk: StreamChunkCallback
-): Promise<{ provider: "anthropic" | "openai" | "gemini" | "groq" | "canned" }> {
+): Promise<{ provider: "anthropic" | "openai" | "gemini" | "groq" | "canned"; usage?: StreamChatUsage }> {
   const config = getAIConfig();
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
 
@@ -46,7 +54,8 @@ export async function streamChat(
       options.systemPrompt,
       options.messages,
       maxTokens,
-      onChunk
+      onChunk,
+      options.model
     );
   }
 
@@ -93,12 +102,14 @@ async function streamAnthropic(
   systemPrompt: string,
   messages: ChatMessage[],
   maxTokens: number,
-  onChunk: StreamChunkCallback
-): Promise<{ provider: "anthropic" }> {
+  onChunk: StreamChunkCallback,
+  modelOverride?: string
+): Promise<{ provider: "anthropic"; usage?: StreamChatUsage }> {
   const { default: Anthropic } = await import("@anthropic-ai/sdk");
   const anthropic = new Anthropic({ apiKey });
-  const stream = await anthropic.messages.stream({
-    model: INTERVENTION_MODEL_ANTHROPIC,
+  const model = modelOverride ?? INTERVENTION_MODEL_ANTHROPIC;
+  const stream = anthropic.messages.stream({
+    model,
     max_tokens: maxTokens,
     system: systemPrompt,
     messages: messages
@@ -107,7 +118,6 @@ async function streamAnthropic(
         role: m.role as "user" | "assistant",
         content: m.content,
       })),
-    stream: true,
   });
   for await (const event of stream) {
     if (
@@ -119,7 +129,19 @@ async function streamAnthropic(
       if (text) onChunk(text);
     }
   }
-  return { provider: "anthropic" };
+  try {
+    const finalMsg = await stream.finalMessage();
+    return {
+      provider: "anthropic",
+      usage: {
+        inputTokens: finalMsg.usage.input_tokens,
+        outputTokens: finalMsg.usage.output_tokens,
+        model,
+      },
+    };
+  } catch {
+    return { provider: "anthropic" };
+  }
 }
 
 async function streamOpenAI(
@@ -225,6 +247,7 @@ export async function chat(options: {
   messages: ChatMessage[];
   maxTokens?: number;
   messageAttempted?: string;
+  model?: string;
 }): Promise<{ text: string; provider: "anthropic" | "openai" | "gemini" | "groq" | "canned" }> {
   const parts: string[] = [];
   const { provider } = await streamChat(options, (t) => parts.push(t));

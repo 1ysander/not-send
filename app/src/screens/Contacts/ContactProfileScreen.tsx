@@ -5,7 +5,9 @@ import {
   updateFlaggedContact,
   getContactProfile,
   setContactProfile,
+  setContactProfileRemote,
   getDeviceId,
+  supabaseEnabled,
 } from "@/lib/storage";
 import { uploadConversationFile } from "@/api";
 import { PageLayout } from "@/components/PageLayout";
@@ -50,6 +52,7 @@ export function ContactProfileScreen() {
   // ── Upload state ──
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // ── Profile (re-read after saves) ──
   const [profile, setProfile] = useState(() =>
@@ -104,16 +107,16 @@ export function ContactProfileScreen() {
       noContactDays: typeof noContactDays === "number" ? noContactDays : undefined,
     };
     setContactProfile(contactId, updated);
+    if (supabaseEnabled) {
+      setContactProfileRemote(contactId, updated).catch(() => {});
+    }
     setProfile(updated);
     setContextSaved(true);
     setTimeout(() => setContextSaved(false), 2000);
   }
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !contactId) return;
-    e.target.value = "";
-
+  async function handleFile(file: File) {
+    if (!contactId) return;
     setUploading(true);
     setUploadError(null);
     try {
@@ -124,13 +127,44 @@ export function ContactProfileScreen() {
         sampleMessages: result.sampleMessages,
         relationshipMemory: result.relationshipMemory,
       };
-      setContactProfile(contactId, updated);
+      if (supabaseEnabled) {
+        try {
+          await setContactProfileRemote(contactId, updated);
+        } catch {
+          setContactProfile(contactId, updated);
+        }
+      } else {
+        setContactProfile(contactId, updated);
+      }
       setProfile(updated);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Upload failed. Try again.");
     } finally {
       setUploading(false);
     }
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    await handleFile(file);
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    if (!isDragging) setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false);
+  }
+
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) await handleFile(file);
   }
 
   return (
@@ -274,23 +308,28 @@ export function ContactProfileScreen() {
               type="button"
               disabled={uploading}
               onClick={() => fileInputRef.current?.click()}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
               className={cn(
-                "flex w-full flex-col items-center gap-3 rounded-xl border-2 border-dashed border-border py-8 px-4 text-center transition-colors",
-                "hover:border-[#bf5af2]/40 hover:bg-[#bf5af2]/5 active:bg-[#bf5af2]/10",
+                "flex w-full flex-col items-center gap-3 rounded-xl border-2 border-dashed py-8 px-4 text-center transition-all",
+                isDragging
+                  ? "border-[#bf5af2] bg-[#bf5af2]/10 scale-[1.02]"
+                  : "border-border hover:border-[#bf5af2]/40 hover:bg-[#bf5af2]/5 active:bg-[#bf5af2]/10",
                 uploading && "opacity-60 pointer-events-none"
               )}
             >
               {uploading ? (
                 <RefreshCw className="h-7 w-7 text-muted-foreground animate-spin" />
               ) : (
-                <Upload className="h-7 w-7 text-muted-foreground" />
+                <Upload className={cn("h-7 w-7 transition-colors", isDragging ? "text-[#bf5af2]" : "text-muted-foreground")} />
               )}
               <div>
                 <p className="text-[14px] font-semibold text-foreground">
-                  {uploading ? "Parsing conversation…" : "Upload .txt export"}
+                  {uploading ? "Parsing conversation…" : isDragging ? "Drop to upload" : "Upload .txt export"}
                 </p>
                 <p className="text-[12px] text-muted-foreground mt-0.5">
-                  iPhone → Settings → Export chat
+                  {isDragging ? "" : "Drag & drop or click · iPhone → Settings → Export chat"}
                 </p>
               </div>
             </button>

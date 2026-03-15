@@ -6,6 +6,9 @@ import {
   getSessions,
   getNoContactSince,
   setNoContactSince,
+  getMoodLogRemote,
+  logMoodRemote,
+  supabaseEnabled,
 } from "@/lib/storage";
 import { PageLayout } from "@/components/PageLayout";
 import { MessageCircle, Shield } from "lucide-react";
@@ -201,12 +204,33 @@ export function StatsScreen() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setLog(getMoodLog());
-    const entry = getTodayEntry();
-    setTodayScore(entry?.score ?? null);
-    setNote(entry?.note ?? "");
-    setJournal(entry?.journal ?? "");
-    setJournalSaved(!!entry?.journal?.trim());
+    if (supabaseEnabled) {
+      getMoodLogRemote()
+        .then((remoteLog) => {
+          setLog(remoteLog);
+          const today = new Date().toISOString().slice(0, 10);
+          const entry = remoteLog.find((e) => e.date === today) ?? null;
+          setTodayScore(entry?.score ?? null);
+          setNote(entry?.note ?? "");
+          setJournal(entry?.journal ?? "");
+          setJournalSaved(!!entry?.journal?.trim());
+        })
+        .catch(() => {
+          setLog(getMoodLog());
+          const entry = getTodayEntry();
+          setTodayScore(entry?.score ?? null);
+          setNote(entry?.note ?? "");
+          setJournal(entry?.journal ?? "");
+          setJournalSaved(!!entry?.journal?.trim());
+        });
+    } else {
+      setLog(getMoodLog());
+      const entry = getTodayEntry();
+      setTodayScore(entry?.score ?? null);
+      setNote(entry?.note ?? "");
+      setJournal(entry?.journal ?? "");
+      setJournalSaved(!!entry?.journal?.trim());
+    }
     setTotalMessages(getTotalMessagesIntercepted());
     setNoContactSinceState(getNoContactSince());
   }, []);
@@ -225,6 +249,9 @@ export function StatsScreen() {
     saveTimerRef.current = setTimeout(() => {
       const currentJournal = getTodayEntry()?.journal;
       logMood(todayScore, note.trim() || undefined, currentJournal);
+      if (supabaseEnabled) {
+        logMoodRemote(todayScore, note.trim() || undefined, currentJournal).catch(() => {});
+      }
       setLog(getMoodLog());
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 1800);
@@ -237,6 +264,9 @@ export function StatsScreen() {
   const handleSelectScore = useCallback((score: number) => {
     setTodayScore(score);
     logMood(score, note.trim() || undefined, journal.trim() || undefined);
+    if (supabaseEnabled) {
+      logMoodRemote(score, note.trim() || undefined, journal.trim() || undefined).catch(() => {});
+    }
     setLog(getMoodLog());
     setJustSaved(true);
     setTimeout(() => setJustSaved(false), 1800);
@@ -264,6 +294,9 @@ export function StatsScreen() {
   const handleSubmitJournal = useCallback(() => {
     if (todayScore === null || !journal.trim()) return;
     logMood(todayScore, note.trim() || undefined, journal.trim());
+    if (supabaseEnabled) {
+      logMoodRemote(todayScore, note.trim() || undefined, journal.trim()).catch(() => {});
+    }
     setLog(getMoodLog());
     setJournalSaved(true);
     setJournalJustSaved(true);

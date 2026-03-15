@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { addFlaggedContact, setContactProfile, getDeviceId } from "@/lib/storage";
+import { addFlaggedContact, addFlaggedContactRemote, setContactProfile, setContactProfileRemote, getDeviceId, supabaseEnabled } from "@/lib/storage";
 import { uploadConversationFile } from "@/api";
 import type { ConversationDateRange } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -32,10 +32,11 @@ export function AddContactScreen() {
   const [userMessageCount, setUserMessageCount] = useState<number | null>(null);
   const [partnerMessageCount, setPartnerMessageCount] = useState<number | null>(null);
 
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate     = useNavigate();
 
-  function handleSubmitForm(e: React.FormEvent) {
+  async function handleSubmitForm(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     const trimmedName  = name.trim();
@@ -44,25 +45,40 @@ export function AddContactScreen() {
       setError("Both fields are required.");
       return;
     }
-    const contact = addFlaggedContact({ name: trimmedName, phoneNumber: trimmedPhone });
+    let contact: ReturnType<typeof addFlaggedContact>;
+    if (supabaseEnabled) {
+      try {
+        contact = await addFlaggedContactRemote({ name: trimmedName, phoneNumber: trimmedPhone });
+      } catch {
+        contact = addFlaggedContact({ name: trimmedName, phoneNumber: trimmedPhone });
+      }
+    } else {
+      contact = addFlaggedContact({ name: trimmedName, phoneNumber: trimmedPhone });
+    }
     setContactId(contact.id);
     setStep("upload");
   }
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !contactId) return;
-    e.target.value = "";
-
+  async function handleFile(file: File) {
+    if (!contactId) return;
     setUploading(true);
     setUploadError(null);
     try {
       const deviceId = getDeviceId();
       const result = await uploadConversationFile(file, { deviceId, userName: name.trim() || undefined });
-      setContactProfile(contactId, {
+      const profile = {
         sampleMessages: result.sampleMessages,
         relationshipMemory: result.relationshipMemory,
-      });
+      };
+      if (supabaseEnabled) {
+        try {
+          await setContactProfileRemote(contactId, profile);
+        } catch {
+          setContactProfile(contactId, profile);
+        }
+      } else {
+        setContactProfile(contactId, profile);
+      }
       setMessageCount(result.messageCount);
       setDateRange(result.dateRange ?? null);
       setUserMessageCount(result.userMessageCount ?? null);
@@ -73,6 +89,29 @@ export function AddContactScreen() {
     } finally {
       setUploading(false);
     }
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    await handleFile(file);
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    if (!isDragging) setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false);
+  }
+
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) await handleFile(file);
   }
 
   function handleContinue() {
@@ -211,23 +250,28 @@ export function AddContactScreen() {
                     type="button"
                     disabled={uploading}
                     onClick={() => fileInputRef.current?.click()}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
                     className={cn(
-                      "flex w-full flex-col items-center gap-3 rounded-xl border-2 border-dashed border-border py-8 px-4 text-center transition-colors",
-                      "hover:border-[#bf5af2]/40 hover:bg-[#bf5af2]/5 active:bg-[#bf5af2]/10",
+                      "flex w-full flex-col items-center gap-3 rounded-xl border-2 border-dashed py-8 px-4 text-center transition-all",
+                      isDragging
+                        ? "border-[#bf5af2] bg-[#bf5af2]/10 scale-[1.02]"
+                        : "border-border hover:border-[#bf5af2]/40 hover:bg-[#bf5af2]/5 active:bg-[#bf5af2]/10",
                       uploading && "opacity-60 pointer-events-none"
                     )}
                   >
                     {uploading ? (
                       <RefreshCw className="h-7 w-7 text-muted-foreground animate-spin" />
                     ) : (
-                      <Upload className="h-7 w-7 text-muted-foreground" />
+                      <Upload className={cn("h-7 w-7 transition-colors", isDragging ? "text-[#bf5af2]" : "text-muted-foreground")} />
                     )}
                     <div>
                       <p className="text-[14px] font-semibold text-foreground">
-                        {uploading ? "Parsing conversation…" : "Upload .txt export"}
+                        {uploading ? "Parsing conversation…" : isDragging ? "Drop to upload" : "Upload .txt export"}
                       </p>
                       <p className="text-[12px] text-muted-foreground mt-0.5">
-                        iPhone → Settings → Export chat
+                        {isDragging ? "" : "Drag & drop or click · iPhone → Settings → Export chat"}
                       </p>
                     </div>
                   </button>

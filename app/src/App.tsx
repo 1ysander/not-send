@@ -18,6 +18,7 @@ import { ContactsScreen } from "./screens/Contacts/ContactsScreen";
 import { ContactProfileScreen } from "./screens/Contacts/ContactProfileScreen";
 import { InterventionChat } from "./screens/Intervention/InterventionChat";
 import { EnterpriseScreen } from "./screens/Enterprise/EnterpriseScreen";
+import { UploadScreen } from "./screens/Upload/UploadScreen";
 
 /** Guards the main app: requires auth (when Supabase enabled) + onboarding.
  *  Enterprise product mode users are redirected to /enterprise instead of the main app. */
@@ -62,6 +63,7 @@ export default function App() {
     <Routes>
       {/* Public routes — no auth required */}
       <Route path="/home" element={<HomeScreen />} />
+      <Route path="/upload" element={<UploadScreen />} />
       <Route path="/login" element={<LoginScreen />} />
       <Route path="/enterprise" element={<EnterpriseScreen />} />
       <Route path="/onboarding" element={<PublicOnboardingOnly><AddContactScreen /></PublicOnboardingOnly>} />

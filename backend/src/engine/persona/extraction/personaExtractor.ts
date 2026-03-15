@@ -9,6 +9,7 @@ import { attributeMessages } from "../parser/senderDisambiguator.js";
 import { llmAssistedParse } from "../parser/llmAssistedParser.js";
 import { computeStatisticalProfile } from "./statisticalAnalyzer.js";
 import { runExtractionCall } from "./extractionPrompt.js";
+import { runUnifiedExtraction } from "./unifiedExtractor.js";
 import { personaStore } from "../personaStore.js";
 import type { PersonaProfile, AttributedMessage } from "../models/PersonaTypes.js";
 
@@ -68,8 +69,13 @@ export async function extractPersona(input: ExtractionInput): Promise<Extraction
   // Step 3: compute local stats
   const stats = computeStatisticalProfile(messagesToUse);
 
-  // Step 4: run LLM extraction
-  const personaJson = await runExtractionCall(targetName, stats, messagesToUse);
+  // Step 4: run both extractions in parallel
+  // - runExtractionCall: existing style/behavior extraction (uses configured AI provider)
+  // - runUnifiedExtraction: deep psychological extraction (always uses Groq — free tier)
+  const [personaJson, unifiedPsych] = await Promise.all([
+    runExtractionCall(targetName, stats, messagesToUse),
+    runUnifiedExtraction(targetName, messagesToUse),
+  ]);
 
   // Step 5: store persona
   const now = Date.now();
@@ -82,6 +88,7 @@ export async function extractPersona(input: ExtractionInput): Promise<Extraction
     personaVersion: "1.0",
     correctionCount: 0,
     accuracyStage: 1,
+    ...(unifiedPsych != null && { unifiedPsych }),
     createdAt: now,
     updatedAt: now,
   };

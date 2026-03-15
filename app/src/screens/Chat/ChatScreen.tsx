@@ -14,6 +14,10 @@ import {
   getContactAIChatHistory,
   setContactAIChatHistory,
   clearContactAIChatHistory,
+  getContactAIChatHistoryRemote,
+  appendContactAIChatMessageRemote,
+  clearContactAIChatHistoryRemote,
+  supabaseEnabled,
 } from "../../lib/storage";
 import { streamContactChatAPI } from "../../api";
 import type { AIChatMessage, RelationshipMemory } from "../../types";
@@ -51,9 +55,7 @@ export function ChatScreen() {
     ? getFlaggedContacts().find((c) => c.id === contactId) ?? null
     : null;
 
-  const [messages, setMessages] = useState<AIChatMessage[]>(() =>
-    contactId ? getContactAIChatHistory(contactId) : []
-  );
+  const [messages, setMessages] = useState<AIChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [status, setStatus] = useState<ChatStatus>("idle");
   const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus>("none");
@@ -62,13 +64,24 @@ export function ChatScreen() {
   const endRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Load chat history on mount — remote if Supabase enabled, local otherwise
+  useEffect(() => {
+    if (!contactId) return;
+    if (supabaseEnabled) {
+      getContactAIChatHistoryRemote(contactId)
+        .then((msgs) => {
+          setMessages(msgs);
+          setContactAIChatHistory(contactId, msgs); // update local cache
+        })
+        .catch(() => setMessages(getContactAIChatHistory(contactId)));
+    } else {
+      setMessages(getContactAIChatHistory(contactId));
+    }
+  }, [contactId]);
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  useEffect(() => {
-    if (contactId) setContactAIChatHistory(contactId, messages);
-  }, [messages, contactId]);
 
   useEffect(() => () => { abortRef.current?.abort(); }, []);
 
@@ -126,8 +139,19 @@ export function ChatScreen() {
               return [...rest, { role: "assistant" as const, content: fullReply }];
             });
           },
-          { deviceId, userContext }
+          { deviceId, userContext, conversationId: contactId }
         );
+        // Persist completed turn
+        const assistantMsg: AIChatMessage = { role: "assistant" as const, content: fullReply };
+        if (supabaseEnabled) {
+          try {
+            await appendContactAIChatMessageRemote(contactId, userMsg);
+            await appendContactAIChatMessageRemote(contactId, assistantMsg);
+          } catch {
+            // fallback: local cache already kept by next line
+          }
+        }
+        setContactAIChatHistory(contactId, [...nextMessages, assistantMsg]);
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
         setError(err instanceof Error ? err.message : "Something went wrong");
@@ -149,6 +173,9 @@ export function ChatScreen() {
   function handleClear() {
     if (!contactId) return;
     clearContactAIChatHistory(contactId);
+    if (supabaseEnabled) {
+      clearContactAIChatHistoryRemote(contactId).catch(() => {});
+    }
     setMessages([]);
     setShowClear(false);
     setDeliveryStatus("none");

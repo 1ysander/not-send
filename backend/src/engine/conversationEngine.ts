@@ -19,9 +19,12 @@ import {
   getConversationHistory,
   getUserContext,
   getPartnerContext,
+  logTokenUsage,
 } from "../store.js";
 import type { UserContext, PartnerContext } from "../types.js";
 import type { ChatMessage } from "../ai/types.js";
+import { assembleContext, windowToMessages } from "./memory/memoryEngine.js";
+import { formatContextForPrompt } from "./memory/contextAssembler.js";
 
 // --- Types ---
 
@@ -188,6 +191,8 @@ export interface ContactChatStreamOptions {
   partnerContext: PartnerContext;
   userContext?: UserContext;
   deviceId?: string;
+  /** Stable ID for this conversation thread — used to key memory state. */
+  conversationId?: string;
 }
 
 export async function streamIntervention(
@@ -199,7 +204,7 @@ export async function streamIntervention(
   // Merge stored context with request context
   const resolvedUserContext: UserContext | undefined =
     userContext ??
-    (deviceId ? getUserContext(deviceId) : undefined);
+    (deviceId ? await getUserContext(deviceId) : undefined);
 
   const systemPrompt = buildInterventionSystemPrompt(messageAttempted, {
     userContext: resolvedUserContext,
@@ -211,15 +216,26 @@ export async function streamIntervention(
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
   const parts: string[] = [];
-  await streamChat(
+  const { usage } = await streamChat(
     { systemPrompt, messages: chatMessages, messageAttempted },
     (chunk) => { parts.push(chunk); onChunk(chunk); }
   );
 
   if (sessionId) {
     const lastUser = messages.filter((m) => m.role === "user").at(-1);
-    if (lastUser) appendConversationTurn(sessionId, "user", lastUser.content);
-    appendConversationTurn(sessionId, "assistant", parts.join(""));
+    if (lastUser) await appendConversationTurn(sessionId, "user", lastUser.content, deviceId);
+    await appendConversationTurn(sessionId, "assistant", parts.join(""), deviceId);
+  }
+
+  if (usage && deviceId) {
+    await logTokenUsage({
+      userId: deviceId,
+      sessionId,
+      mode: "intervention",
+      model: usage.model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+    });
   }
 }
 
@@ -231,7 +247,7 @@ export async function streamClosure(
 
   const resolvedUserContext: UserContext | undefined =
     userContext ??
-    (deviceId ? getUserContext(deviceId) : undefined);
+    (deviceId ? await getUserContext(deviceId) : undefined);
 
   const systemPrompt = buildClosureSystemPrompt(partnerContext, resolvedUserContext);
 
@@ -239,7 +255,17 @@ export async function streamClosure(
     .filter((m) => m.role === "user" || m.role === "assistant")
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
-  await streamChat({ systemPrompt, messages: chatMessages }, onChunk);
+  const { usage } = await streamChat({ systemPrompt, messages: chatMessages }, onChunk);
+
+  if (usage && deviceId) {
+    await logTokenUsage({
+      userId: deviceId,
+      mode: "closure",
+      model: usage.model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+    });
+  }
 }
 
 export async function streamSupport(
@@ -250,7 +276,7 @@ export async function streamSupport(
 
   const resolvedUserContext: UserContext | undefined =
     userContext ??
-    (deviceId ? getUserContext(deviceId) : undefined);
+    (deviceId ? await getUserContext(deviceId) : undefined);
 
   const systemPrompt = buildSupportSystemPrompt(resolvedUserContext, partnerContext);
 
@@ -258,38 +284,79 @@ export async function streamSupport(
     .filter((m) => m.role === "user" || m.role === "assistant")
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
-  await streamChat({ systemPrompt, messages: chatMessages }, onChunk);
+  const { usage } = await streamChat({ systemPrompt, messages: chatMessages }, onChunk);
+
+  if (usage && deviceId) {
+    await logTokenUsage({
+      userId: deviceId,
+      mode: "support",
+      model: usage.model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+    });
+  }
 }
 
-// Max turns to send per request — keeps token usage low on free tier
-const CONTACT_CHAT_HISTORY_TURNS = 6;
 const CONTACT_CHAT_MAX_TOKENS = 300;
 
 export async function streamContactChat(
   opts: ContactChatStreamOptions,
   onChunk: StreamCallback
 ): Promise<void> {
-  const { messages, partnerContext, userContext, deviceId } = opts;
+  const { messages, partnerContext, userContext, deviceId, conversationId } = opts;
 
   const resolvedUserContext: UserContext | undefined =
     userContext ??
-    (deviceId ? getUserContext(deviceId) : undefined);
+    (deviceId ? await getUserContext(deviceId) : undefined);
 
-  const systemPrompt = buildContactChatSystemPrompt(partnerContext, resolvedUserContext);
+  // Derive a stable conversation ID from the provided id or partner name
+  const convId = conversationId ?? partnerContext.partnerName.toLowerCase().replace(/\s+/g, "_");
 
-  // Cap history to last N turns to avoid burning tokens on long conversations
-  const chatMessages: ChatMessage[] = messages
-    .filter((m) => m.role === "user" || m.role === "assistant")
-    .slice(-CONTACT_CHAT_HISTORY_TURNS)
-    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+  // Identify the new user message (last user turn)
+  const allUserMessages = messages.filter((m) => m.role === "user");
+  const newUserMessage = allUserMessages.at(-1)?.content ?? "";
 
-  await streamChat({ systemPrompt, messages: chatMessages, maxTokens: CONTACT_CHAT_MAX_TOKENS }, onChunk);
+  // ── Memory Engine: assemble optimized context window ──────────────────────
+  // Runs Window Manager (code) + Compressor (Sonnet, if overflow) + Retriever (Haiku, if anaphoric)
+  // Falls back gracefully if Anthropic is not the active provider
+  let chatMessages: ChatMessage[];
+  let memoryContextBlock = "";
+
+  try {
+    const payload = await assembleContext(convId, messages, newUserMessage);
+    chatMessages = windowToMessages(payload.active_window).map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    }));
+    memoryContextBlock = formatContextForPrompt(payload);
+  } catch (err) {
+    // Memory engine failure is non-fatal — fall back to simple history slice
+    console.error("[streamContactChat] Memory engine failed, falling back:", err);
+    chatMessages = messages
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .slice(-6)
+      .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+  }
+
+  const systemPrompt = buildContactChatSystemPrompt(partnerContext, resolvedUserContext, memoryContextBlock);
+
+  const { usage } = await streamChat({ systemPrompt, messages: chatMessages, maxTokens: CONTACT_CHAT_MAX_TOKENS }, onChunk);
+
+  if (usage && deviceId) {
+    await logTokenUsage({
+      userId: deviceId,
+      mode: "contact",
+      model: usage.model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+    });
+  }
 }
 
 export function getHistory(sessionId: string) {
   return getConversationHistory(sessionId);
 }
 
-export function getPartnerContextByDevice(deviceId: string): PartnerContext | undefined {
+export async function getPartnerContextByDevice(deviceId: string): Promise<PartnerContext | undefined> {
   return getPartnerContext(deviceId);
 }
