@@ -1,15 +1,15 @@
-# NOTSENT — AI Breakup Intervention App
+# NOTSENT is AI Breakup Intervention App
 
-> **This is a public shell / reference architecture.** All API keys, credentials, and personal data have been removed. The project is shared for reference and learning purposes only — it is not a deployable product in its current state.
+> **This is a public shell / reference architecture.** All API keys, credentials, and personal data have been removed. The project is shared for reference and learning purposes only it is not a deployable product in its current state.
 
 ---
 
 ## What this is
 
-NOTSENT is an AI-powered web app that helps people process the impulse to text their ex — without actually doing it. Users upload an exported iMessage conversation (`.txt` from iPhone), and the AI uses that context to power three modes:
+NOTSENT is an AI powered web app that I built for my friends. It helps people process the impulse to text their exs without actually doing it. Users upload an exported iMessage conversation (`.txt` from iPhone), and the AI uses that context to power three modes:
 
 1. **Intervention** — You write the message you *want* to send. The AI talks you through the impulse before it goes anywhere.
-2. **Closure** — The AI plays your ex's voice (trained on the uploaded conversation) so you can have the conversation you need without real contact.
+2. **Closure** — The AI plays your ex's conversation style (trained on the uploaded conversation) so you can have the conversation you need without real contact.
 3. **Support** — General emotional support chat.
 
 No live iMessage integration. No real contact. Just processing.
